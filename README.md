@@ -1,7 +1,10 @@
 
-# ST7789 Driver for MicroPython
+# [st7735](https://github.com/russhughes/st7735_mpy)
+# [gc9a01](https://github.com/russhughes/gc9a01_mpy)
 
-This driver is based on [devbis' st7789_mpy driver.](https://github.com/devbis/st7789_mpy)
+# ST7735 Driver for MicroPython
+
+This driver is based on [devbis' st7735_mpy driver.](https://github.com/russhughes/st7735_mpy)
 I modified the original driver for one of my projects to add:
 
 - Display Rotation.
@@ -28,12 +31,12 @@ rowstart values needed for a display.
 ### Color Modes
 
 You can test for the correct color order needed by a display by filling it with
-the `st7789.RED` color and observing the actual color displayed.
+the `ST7735.RED` color and observing the actual color displayed.
 
   - If the displayed color is RED, the settings are correct.
-  - If the displayed color is BLUE, `color_order` should be `st7789.BGR`.
+  - If the displayed color is BLUE, `color_order` should be `ST7735.BGR`.
   - If the displayed color is YELLOW, `inversion_mode` should be `True.`
-  - If the displayed color is CYAN, `color_order` should be `st7789.BGR` and
+  - If the displayed color is CYAN, `color_order` should be `ST7735.BGR` and
     `inversion_mode` should be `True.`
 
 ### colstart and rowstart
@@ -53,7 +56,7 @@ your display, these values can be overridden using the `offsets` method. The
 
 ```
 inversion_mode(False)
-color_order = st7789.BGR
+color_order = ST7735.BGR
 for rotation 0 use offset(2, 1)
 for rotation 1 use offset(1, 2)
 for rotation 2 use offset(2, 3)
@@ -64,7 +67,7 @@ for rotation 3 use offset(3, 2)
 
 ```
 inversion_mode(False)
-color_order = st7789.RGB
+color_order = ST7735.RGB
 for rotation 0 use offset(0, 0)
 for rotation 1 use offset(0, 0)
 for rotation 2 use offset(0, 0)
@@ -74,29 +77,15 @@ for rotation 3 use offset(0, 0)
 ## Pre-compiled firmware files
 
 The firmware directory contains pre-compiled firmware for various devices with
-the st7789 C driver and frozen python font files. See the README.md file in the
+the ST7735 C driver and frozen python font files. See the README.md file in the
 fonts folder for more information on the font files.
 
 MicroPython MicroPython v1.19.1-18-g6e868d47d compiled with ESP IDF v4.4 using CMake
 
 Directory             | File         | Device
 --------------------- | ------------ | ----------------------------------
-GENERIC-7789          | firmware.bin | Generic ESP32 devices
-GENERIC_SPIRAM-7789   | firmware.bin | Generic ESP32 devices with SPI Ram
-GENERIC_C3            | firmware.bin | Generic ESP32-C3 devices
-PYBV11                | firmware.dfu | Pyboard v1.1
-RP2                   | firmware.uf2 | Raspberry Pi Pico RP2040
-RP2W                  | firmware.uf2 | Raspberry Pi PicoW RP2040 (untested)
-T-DISPLAY             | firmware.bin | LILYGO® TTGO T-Display
-T-Watch-2020          | firmware.bin | LILYGO® T-Watch 2020
+GENERIC_S3            | micropython.bin | Generic ESP32-C3 devices
 
-
-## Additional Modules
-
-Module             | Source
------------------- | -----------------------------------------------------------
-axp202c            | https://github.com/lewisxhe/AXP202X_Libraries
-focaltouch         | https://gitlab.com/mooond/t-watch2020-esp32-with-micropython
 
 ## Video Examples
 
@@ -126,13 +115,13 @@ This is a work in progress.
 
 ## Overview
 
-This is a driver for MicroPython to handle cheap displays based on the ST7789
+This is a driver for MicroPython to handle cheap displays based on the ST7735
 chip. The driver is written in C. Firmware is provided for ESP32, ESP32 with SPIRAM,
 pyboard1.1, and Raspberry Pi Pico devices.
 
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/russhughes/st7789_mpy/master/docs/ST7789.jpg" alt="ST7789 display photo"/>
+  <img src="https://raw.githubusercontent.com/russhughes/st7735_mpy/master/docs/ST7735.jpg" alt="ST7735 display photo"/>
 </p>
 
 
@@ -140,7 +129,7 @@ pyboard1.1, and Raspberry Pi Pico devices.
 
 See the MicroPython
 [README.md](https://github.com/micropython/micropython/blob/master/ports/esp32/README.md#setting-up-esp-idf-and-the-build-environment)
-if you run into any build issues not directly related to the st7789 driver. The
+if you run into any build issues not directly related to the ST7735 driver. The
 recommended MicroPython build instructions may have changed.
 
 Update and upgrade Ubuntu using apt-get if you are using a new install of
@@ -202,10 +191,10 @@ Clone the MicroPython repo.
 git clone https://github.com/micropython/micropython.git
 ```
 
-Clone the st7789 driver repo.
+Clone the st7735 driver repo.
 
 ```bash
-git clone https://github.com/russhughes/st7789_mpy.git
+git clone https://github.com/mmMicky/st7735_mpy.git
 ```
 
 Update the git submodules and compile the MicroPython cross-compiler
@@ -228,9 +217,9 @@ firmware continuously reboots with an error.
 For example:
 
 ```bash
-cp ../../../st7789_mpy/fonts/bitmap/vga1_16x16.py modules
-cp ../../../st7789_mpy/fonts/truetype/NotoSans_32.py modules
-cp ../../../st7789_mpy/fonts/vector/scripts.py modules
+cp ../../../st7735_mpy/fonts/bitmap/vga1_16x16.py modules
+cp ../../../st7735_mpy/fonts/truetype/NotoSans_32.py modules
+cp ../../../st7735_mpy/fonts/vector/scripts.py modules
 ```
 
 Build the MicroPython firmware with the driver and frozen .py files in the
@@ -238,7 +227,7 @@ modules directory. If you did not add any .py files to the modules directory,
 you can leave out the FROZEN_MANIFEST and FROZEN_MPY_DIR settings.
 
 ```bash
-make USER_C_MODULES=../../../../st7789_mpy/st7789/micropython.cmake FROZEN_MANIFEST="" FROZEN_MPY_DIR=$UPYDIR/modules
+make USER_C_MODULES=../../../../st7735_mpy/st7735/micropython.cmake FROZEN_MANIFEST="" FROZEN_MPY_DIR=$UPYDIR/modules
 ```
 
 Erase and flash the firmware to your device. Set PORT= to the ESP32's usb
@@ -247,8 +236,8 @@ Subsystem (WSL2) for Linux. If you have the same issue, you can copy the
 firmware.bin file and use the Windows esptool.py to flash your device.
 
 ```bash
-make USER_C_MODULES=../../../../st7789_mpy/st7789/micropython.cmake PORT=/dev/ttyUSB0 erase
-make USER_C_MODULES=../../../../st7789_mpy/st7789/micropython.cmake PORT=/dev/ttyUSB0 deploy
+make USER_C_MODULES=../../../../st7735_mpy/st7735/micropython.cmake PORT=/dev/ttyUSB0 erase
+make USER_C_MODULES=../../../../st7735_mpy/st7735/micropython.cmake PORT=/dev/ttyUSB0 deploy
 ```
 
 The firmware.bin file will be in the build-GENERIC directory. To flash using
@@ -273,7 +262,7 @@ for ESP32:
 
 And then compile the module with specified USER_C_MODULES dir.
 
-    $ make USER_C_MODULES=../../../../st7789_mpy/st7789/micropython.cmake
+    $ make USER_C_MODULES=../../../../st7735_mpy/st7735/micropython.cmake
 
 for Raspberry Pi PICO:
 
@@ -281,7 +270,7 @@ for Raspberry Pi PICO:
 
 And then compile the module with specified USER_C_MODULES dir.
 
-    $ make USER_C_MODULES=../../../st7789_mpy/st7789/micropython.cmake
+    $ make USER_C_MODULES=../../../st7735_mpy/st7735/micropython.cmake
 
 ## Working examples
 
@@ -293,9 +282,9 @@ of the screen.
     # ESP32
 
     import machine
-    import st7789
+    import st7735
     spi = machine.SPI(2, baudrate=40000000, polarity=1, sck=machine.Pin(18), mosi=machine.Pin(23))
-    display = st7789.ST7789(spi, 240, 240, reset=machine.Pin(4, machine.Pin.OUT), dc=machine.Pin(2, machine.Pin.OUT))
+    display = st7735.ST7735(spi, 240, 240, reset=machine.Pin(4, machine.Pin.OUT), dc=machine.Pin(2, machine.Pin.OUT))
     display.init()
 
 
@@ -303,7 +292,7 @@ I could not run the display with a baud rate over 40MHZ.
 
 ## Methods
 
-- `st7789.ST7789(spi, width, height, dc, reset, cs, backlight, rotations, rotation, color_order, inversion, options, buffer_size)`
+- `st7735.ST7735(spi, width, height, dc, reset, cs, backlight, rotations, rotation, color_order, inversion, options, buffer_size)`
 
     ### Required positional arguments:
     - `spi` spi device
@@ -334,7 +323,7 @@ I could not run the display with a baud rate over 40MHZ.
       of tuples for each `rotation` used to set the MADCTL register, display width,
       display height, start_x, and start_y values.
 
-      Default `rotations` are included for the following st7789 and st7735
+      Default `rotations` are included for the following st7735 and st7735
       display sizes:
 
       Display | Default Orientation Tables
@@ -361,7 +350,7 @@ I could not run the display with a baud rate over 40MHZ.
       2     | Reverse Portrait (180 degrees)
       3     | Reverse Landscape (270 degrees)
 
-    - `color_order` sets the color order used by the driver (st7789.RGB or st7789.BGR)
+    - `color_order` sets the color order used by the driver (st7735.RGB or st7735.BGR)
 
     - `inversion` Sets the display color inversion mode if True, clears the
       display color inversion mode if false.
@@ -370,9 +359,9 @@ I could not run the display with a baud rate over 40MHZ.
 
       Option | Description
       ------ | -----------
-      st7789.WRAP | pixels, lines, polygons, and Hershey text will wrap around the display both horizontally and vertically.
-      st7789.WRAP_H | pixels, lines, polygons, and Hershey text will wrap around the display horizontally.
-      st7789.WRAP_V | pixels, lines, polygons, and Hershey text will wrap around the display vertically.
+      st7735.WRAP | pixels, lines, polygons, and Hershey text will wrap around the display both horizontally and vertically.
+      st7735.WRAP_H | pixels, lines, polygons, and Hershey text will wrap around the display horizontally.
+      st7735.WRAP_V | pixels, lines, polygons, and Hershey text will wrap around the display vertically.
 
     - `buffer_size` If a buffer_size is not specified, a dynamically allocated
       buffer is created and freed as needed. If a buffer_size is set, it must
@@ -391,30 +380,40 @@ I could not run the display with a baud rate over 40MHZ.
 
     Constant Name    | Value | Description
     ---------------- | ----- | ----------------------
-    st7789.MADCTL_MY | 0x80  | Page Address Order
-    st7789_MADCTL_MX | 0x40  | Column Address Order
-    st7789_MADCTL_MV | 0x20  | Page/Column Order
-    st7789_MADCTL_ML | 0x10  | Line Address Order
-    st7789_MADCTL_MH | 0x04  | Display Data Latch Order
-    st7789_RGB       | 0x00  | RGB color order
-    st7789_BGR       | 0x08  | BGR color order
+    st7735.MADCTL_MY | 0x80  | Page Address Order
+    st7735_MADCTL_MX | 0x40  | Column Address Order
+    st7735_MADCTL_MV | 0x20  | Page/Column Order
+    st7735_MADCTL_ML | 0x10  | Line Address Order
+    st7735_MADCTL_MH | 0x04  | Display Data Latch Order
+    st7735_RGB       | 0x00  | RGB color order
+    st7735_BGR       | 0x08  | BGR color order
 
    #### [MADCTL examples](#madctl-examples)
 
 
      Orientation | MADCTL Values for RGB color order, for BGR color order add 0x08 to the value.
      ----------- | ---------------------------------------------------------------------------------
-     <img src="https://raw.githubusercontent.com/russhughes/st7789_mpy/master/docs/madctl_0.png" /> | 0x00
-     <img src="https://raw.githubusercontent.com/russhughes/st7789_mpy/master/docs/madctl_y.png" /> | 0x80 ( MADCTL_MY )
-     <img src="https://raw.githubusercontent.com/russhughes/st7789_mpy/master/docs/madctl_x.png" /> | 0x40 ( MADCTL_MX )
-     <img src="https://raw.githubusercontent.com/russhughes/st7789_mpy/master/docs/madctl_xy.png" /> | 0xC0 ( MADCTL_MX + MADCTL_MY )
-     <img src="https://raw.githubusercontent.com/russhughes/st7789_mpy/master/docs/madctl_v.png" /> | 0x20 ( MADCTL_MV )
-     <img src="https://raw.githubusercontent.com/russhughes/st7789_mpy/master/docs/madctl_vy.png" /> | 0xA0 ( MADCTL_MV + MADCTL_MY )
-     <img src="https://raw.githubusercontent.com/russhughes/st7789_mpy/master/docs/madctl_vx.png" /> | 0x60 ( MADCTL_MV + MADCTL_MX )
-     <img src="https://raw.githubusercontent.com/russhughes/st7789_mpy/master/docs/madctl_vxy.png" /> | 0xE0 ( MADCTL_MV + MADCTL_MX + MADCTL_MY )
+     <img src="https://raw.githubusercontent.com/russhughes/st7735_mpy/master/docs/madctl_0.png" /> | 0x00
+     <img src="https://raw.githubusercontent.com/russhughes/st7735_mpy/master/docs/madctl_y.png" /> | 0x80 ( MADCTL_MY )
+     <img src="https://raw.githubusercontent.com/russhughes/st7735_mpy/master/docs/madctl_x.png" /> | 0x40 ( MADCTL_MX )
+     <img src="https://raw.githubusercontent.com/russhughes/st7735_mpy/master/docs/madctl_xy.png" /> | 0xC0 ( MADCTL_MX + MADCTL_MY )
+     <img src="https://raw.githubusercontent.com/russhughes/st7735_mpy/master/docs/madctl_v.png" /> | 0x20 ( MADCTL_MV )
+     <img src="https://raw.githubusercontent.com/russhughes/st7735_mpy/master/docs/madctl_vy.png" /> | 0xA0 ( MADCTL_MV + MADCTL_MY )
+     <img src="https://raw.githubusercontent.com/russhughes/st7735_mpy/master/docs/madctl_vx.png" /> | 0x60 ( MADCTL_MV + MADCTL_MX )
+     <img src="https://raw.githubusercontent.com/russhughes/st7735_mpy/master/docs/madctl_vxy.png" /> | 0xE0 ( MADCTL_MV + MADCTL_MX + MADCTL_MY )
 
-- `init()`
-
+- `init(param)`
+```
+     tft.init(st7735.INITR_GREENTAB)
+     tft.init(st7735.INITR_REDTAB)
+     tft.init(st7735.INITR_BLACKTAB)
+     tft.init(st7735.INITR_GREENTAB2)
+     tft.init(st7735.INITR_GREENTAB3)
+     tft.init(st7735.INITR_GREENTAB4)
+     tft.init(st7735.INITR_GREENTAB5)
+     tft.init(st7735.INITB)
+```
+  Different initialization parameters need to be filled in for different screen initializations
   Must be called to initialize the display.
 
 - `on()`
@@ -626,7 +625,7 @@ I could not run the display with a baud rate over 40MHZ.
   0-Portrait (0 degrees), 1-Landscape (90 degrees), 2-Inverse Portrait (180
   degrees), 3-Inverse Landscape (270 degrees)
 
-- `offset(x_start, y_start)` The memory in the ST7789 controller is configured
+- `offset(x_start, y_start)` The memory in the ST7735 controller is configured
   for a 240x320 display. When using a smaller display like a 240x240 or
   135x240, an offset needs to be added to the x and y parameters so that the
     pixels are written to the memory area corresponding to the visible display.
@@ -658,7 +657,7 @@ The module exposes predefined colors:
 
 ## Scrolling
 
-The st7789 display controller contains a 240 by 320-pixel frame buffer used to
+The st7735 display controller contains a 240 by 320-pixel frame buffer used to
 store the pixels for the display. For scrolling, the frame buffer consists of
 three separate areas; The (`tfa`) top fixed area, the (`height`) scrolling
 area, and the (`bfa`) bottom fixed area. The `tfa` is the upper portion of the
@@ -689,7 +688,7 @@ undisplayed.
 The `vscsad` method sets the (VSSA) Vertical Scroll Start Address. The VSSA
 sets the line in the frame buffer that will be the first line after the `tfa`.
 
-    The ST7789 datasheet warns:
+    The ST7735 datasheet warns:
 
     The value of the vertical scrolling start address is absolute (with reference to the frame memory),
     it must not enter the fixed area (defined by Vertical Scrolling Definition, otherwise undesirable

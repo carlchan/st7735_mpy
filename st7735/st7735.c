@@ -27,7 +27,7 @@
  * THE SOFTWARE.
  */
 
-#define __ST7789_VERSION__ "0.2.1"
+#define __ST7735_VERSION__ "0.0.1"
 #include <stdlib.h>
 #include <math.h>
 #include <stdio.h>
@@ -41,83 +41,164 @@
 #include "extmod/machine_spi.h"
 
 #include "mpfile.h"
-#include "st7789.h"
+#include "st7735.h"
 #include "tjpgd565.h"
 
-#define _swap_int(a, b) { int t = a; a = b; b = t; }s
-#define _swap_int16_t(a, b) { int16_t t = a; a = b; b = t; }
+#define _swap_int(a, b) \
+	{                   \
+		int t = a;      \
+		a	  = b;      \
+		b	  = t;      \
+	}                   \
+	s
+#define _swap_int16_t(a, b) \
+	{                       \
+		int16_t t = a;      \
+		a		  = b;      \
+		b		  = t;      \
+	}
 #define _swap_bytes(val) ((((val) >> 8) & 0x00FF) | (((val) << 8) & 0xFF00))
 #define ABS(N) (((N) < 0) ? (-(N)) : (N))
 #define mp_hal_delay_ms(delay) (mp_hal_delay_us(delay * 1000))
 
-#define CS_LOW() { 						\
-	if (self->cs) {                    	\
-		mp_hal_pin_write(self->cs, 0); 	\
-	}                                  	\
-}
+#define CS_LOW()                           \
+	{                                      \
+		if (self->cs) {                    \
+			mp_hal_pin_write(self->cs, 0); \
+		}                                  \
+	}
 
-#define CS_HIGH() {                     \
-	if (self->cs) {                    	\
-		mp_hal_pin_write(self->cs, 1); 	\
-	}                                  	\
-}
+#define CS_HIGH()                          \
+	{                                      \
+		if (self->cs) {                    \
+			mp_hal_pin_write(self->cs, 1); \
+		}                                  \
+	}
 
 #define DC_LOW() (mp_hal_pin_write(self->dc, 0))
 #define DC_HIGH() (mp_hal_pin_write(self->dc, 1))
 
-#define RESET_LOW() {      					\
-	if (self->reset)                      	\
-		mp_hal_pin_write(self->reset, 0); 	\
-}
+#define RESET_LOW()                           \
+	{                                         \
+		if (self->reset)                      \
+			mp_hal_pin_write(self->reset, 0); \
+	}
 
-#define RESET_HIGH() {                      \
-	if (self->reset)                      	\
-		mp_hal_pin_write(self->reset, 1); 	\
-}
+#define RESET_HIGH()                          \
+	{                                         \
+		if (self->reset)                      \
+			mp_hal_pin_write(self->reset, 1); \
+	}
 
 //
-// Default st7789 and st7735 display orientation tables
+// Default st7735 and st7735 display orientation tables
 // can be overridden during init(), madctl values
 // will be combined with color_mode
 //
 
 //{ madctl, width, height, colstart, rowstart }
+st7735_rotation_t ORIENTATIONS_INITR_BLACKTAB[4] = {
+	{ST7735_MADCTL_MX | ST7735_MADCTL_MY, 0, 0, 0, 0},
+	{ST7735_MADCTL_MY | ST7735_MADCTL_MV, 0, 0, 0, 0},
+	{0x00, 0, 0, 0, 0},
+	{ST7735_MADCTL_MX | ST7735_MADCTL_MV, 0, 0, 0, 0}};
 
-st7789_rotation_t ORIENTATIONS_240x320[4] = {
-	{ 0x00, 240, 320,  0,  0},
-	{ 0x60, 320, 240,  0,  0},
-	{ 0xc0, 240, 320,  0,  0},
-	{ 0xa0, 320, 240,  0,  0}
-};
+st7735_rotation_t ORIENTATIONS_INITR_GREENTAB2[4] = {
+	{ST7735_MADCTL_MX | ST7735_MADCTL_MY, 0, 0, 2, 1},
+	{ST7735_MADCTL_MY | ST7735_MADCTL_MV, 0, 0, 1, 2},
+	{0x00, 0, 0, 2, 1},
+	{ST7735_MADCTL_MX | ST7735_MADCTL_MV, 0, 0, 0, 0}};
 
-st7789_rotation_t ORIENTATIONS_240x240[4] = {
-	{0x00, 240, 240,  0,  0},
-	{0x60, 240, 240,  0,  0},
-	{0xc0, 240, 240,  0, 80},
-	{0xa0, 240, 240, 80,  0}
-};
+st7735_rotation_t ORIENTATIONS_INITR_GREENTAB3[4] = {
+	{ST7735_MADCTL_MX | ST7735_MADCTL_MY, 0, 0, 2, 3},
+	{ST7735_MADCTL_MY | ST7735_MADCTL_MV, 0, 0, 3, 2},
+	{0x00, 0, 0, 2, 1},
+	{ST7735_MADCTL_MX | ST7735_MADCTL_MV, 0, 0, 1, 2}};
 
-st7789_rotation_t ORIENTATIONS_135x240[4] = {
-	{0x00, 135, 240, 52, 40},
-    {0x60, 240, 135, 40, 53},
-    {0xc0, 135, 240, 53, 40},
-    {0xa0, 240, 135, 40, 52}
-};
+st7735_rotation_t ORIENTATIONS_INITR_GREENTAB4[4] = {
+	{ST7735_MADCTL_MX | ST7735_MADCTL_MY | ST7735_MADCTL_MH, 0, 0, 0, 32},
+	{ST7735_MADCTL_MY | ST7735_MADCTL_MV, 0, 0, 32, 0},
+	{0x00, 0, 0, 0, 0},
+	{ST7735_MADCTL_MX | ST7735_MADCTL_MV, 0, 0, 0, 0}};
 
-st7789_rotation_t ORIENTATIONS_128x160[4] = {
-	{0x00, 128, 160, 0, 0},
-    {0x60, 160, 128, 0, 0},
-    {0xc0, 128, 160, 0, 0},
-    {0xa0, 160, 128, 0, 0}
-};
+st7735_rotation_t ORIENTATIONS_INITR_GREENTAB5[4] = {
+	{ST7735_MADCTL_MX | ST7735_MADCTL_MY | ST7735_MADCTL_MH, 0, 0, 26, 1},
+	{ST7735_MADCTL_MY | ST7735_MADCTL_MV, 0, 0, 1, 26},
+	{0x00, 0, 0, 26, 1},
+	{ST7735_MADCTL_MX | ST7735_MADCTL_MV, 0, 0, 1, 26}};
 
-st7789_rotation_t ORIENTATIONS_128x128[4] = {
-    {0x00, 128, 128, 2, 1},
-    {0x60, 128, 128, 1, 2},
-    {0xc0, 128, 128, 2, 3},
-    {0xa0, 128, 128, 3, 2}
-};
+st7735_rotation_t ORIENTATIONS_INITR_REDTAB2[4] = {
+	{ST7735_MADCTL_MX | ST7735_MADCTL_MY | ST7735_MADCTL_MH, 0, 0, 24, 0},
+	{ST7735_MADCTL_MY | ST7735_MADCTL_MV, 0, 0, 0, 24},
+	{0x00, 0, 0, 24, 0},
+	{ST7735_MADCTL_MX | ST7735_MADCTL_MV, 0, 0, 0, 24}};
 
+st7735_rotation_t ORIENTATIONS_INITB[4] = {
+	{ST7735_MADCTL_MX, 0, 0, 0, 0},
+	{ST7735_MADCTL_MY | ST7735_MADCTL_MV | ST7735_MADCTL_MX, 0, 0, 0, 0},
+	{ST7735_MADCTL_MY, 0, 0, 0, 0},
+	{ST7735_MADCTL_MV, 0, 0, 0, 0}};
+
+st7735_rotation_t ORIENTATIONS_COM[4] = {
+	{ST7735_MADCTL_MX | ST7735_MADCTL_MY, 0, 0, 0, 0},
+	{ST7735_MADCTL_MY | ST7735_MADCTL_MV, 0, 0, 0, 0},
+	{0X00, 0, 0, 0, 0},
+	{ST7735_MADCTL_MV | ST7735_MADCTL_MX, 0, 0, 0, 0}};
+
+const st7735_cmd_t Bcmd[] = {
+	{ST7735_SWRESET, {0x00}, 0x80},
+	{ST7735_SLPOUT, {0x00}, 0x80},
+	{ST7735_COLMOD, {0x05}, 0x01},
+	{ST7735_FRMCTR1, {0x00, 0x06, 0x03}, 0x03},
+	{ST7735_MADCTL, {0x40 | ST7735_MADCTL_RGB}, 0x01},
+	{ST7735_DISSET5, {0x15, 0x02}, 0x02},
+	{ST7735_INVCTR, {0x00}, 0x01},
+	{ST7735_PWCTR1, {0x02, 0x70}, 0x02},
+	{ST7735_PWCTR2, {0x05}, 0x01},
+	{ST7735_PWCTR3, {0x01, 0x02}, 0x02},
+	{ST7735_VMCTR1, {0x3C, 0x38}, 0x02},
+	{ST7735_PWCTR6, {0x11, 0x15}, 0x02},
+	{ST7735_GMCTRP1, {0x09, 0x16, 0x09, 0x20, 0x21, 0x1B, 0x13, 0x19, 0x17, 0x15, 0x1E, 0x2B, 0x04, 0x05, 0x02, 0x0E}, 0x10},
+	{ST7735_GMCTRN1, {0x0B, 0x14, 0x08, 0x1E, 0x22, 0x1D, 0x18, 0x1E, 0x1B, 0x1A, 0x24, 0x2B, 0x06, 0x06, 0x02, 0x0F}, 0x10},
+	{ST7735_CASET, {0x00, 0x02, 0x00, 0x81}, 0x04},
+	{ST7735_RASET, {0x00, 0x02, 0x00, 0x81}, 0x04},
+	{ST7735_NORON, {0x00}, 0x80},
+	{0, {0}, 0xff}};
+
+const st7735_cmd_t Rcmd1[] = {
+	{ST7735_SWRESET, {0x00}, 0x80},
+	{ST7735_SLPOUT, {0x00}, 0x80},
+	{ST7735_FRMCTR1, {0x01, 0x2C, 0x2D}, 0x03},
+	{ST7735_FRMCTR2, {0x01, 0x2C, 0x2D}, 0x03},
+	{ST7735_FRMCTR3, {0x01, 0x2C, 0x2D, 0x01, 0x2C, 0x2D}, 0x06},
+	{ST7735_INVCTR, {0x07}, 0x01},
+	{ST7735_PWCTR1, {0xA2, 0x02, 0x84}, 0x03},
+	{ST7735_PWCTR2, {0xC5}, 0x01},
+	{ST7735_PWCTR3, {0x0A, 0x00}, 0x02},
+	{ST7735_PWCTR4, {0x8A, 0x2A}, 0x02},
+	{ST7735_PWCTR5, {0x8A, 0xEE}, 0x02},
+	{ST7735_VMCTR1, {0x0E}, 0x01},
+	{ST7735_INVOFF, {0x00}, 0x01},
+	{ST7735_MADCTL, {0xC0 | ST7735_MADCTL_RGB}, 0x01},
+	{ST7735_COLMOD, {0x05}, 0x01},
+	{0, {0}, 0xff}};
+
+const st7735_cmd_t Rcmd2green[] = {
+	{ST7735_CASET, {0x00, 0x02, 0x00, 0x7F + 0x02}, 0x04},
+	{ST7735_RASET, {0x00, 0x01, 0x00, 0x9F + 0x01}, 0x04},
+	{0, {0}, 0xff}};
+
+const st7735_cmd_t Rcmd2red[] = {
+	{ST7735_CASET, {0x00, 0x00, 0x00, 0x7F}, 0x04},
+	{ST7735_RASET, {0x00, 0x00, 0x00, 0x9F}, 0x04},
+	{0, {0}, 0xff}};
+
+const st7735_cmd_t Rcmd3[] = {
+	{ST7735_GMCTRP1, {0x02, 0x1c, 0x07, 0x12, 0x37, 0x32, 0x29, 0x2d, 0x29, 0x25, 0x2B, 0x39, 0x00, 0x01, 0x03, 0x10}, 0x10},
+	{ST7735_GMCTRN1, {0x03, 0x1d, 0x07, 0x06, 0x2E, 0x2C, 0x29, 0x2D, 0x2E, 0x2E, 0x37, 0x3F, 0x00, 0x00, 0x02, 0x10}, 0x10},
+	{ST7735_NORON, {0x00}, 0x80},
+	{ST7735_DISPON, {0x00}, 0x80},
+	{0, {0}, 0xff}};
 
 STATIC void write_spi(mp_obj_base_t *spi_obj, const uint8_t *buf, int len)
 {
@@ -125,14 +206,14 @@ STATIC void write_spi(mp_obj_base_t *spi_obj, const uint8_t *buf, int len)
 	spi_p->transfer(spi_obj, len, buf, NULL);
 }
 
-STATIC void st7789_ST7789_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind)
+STATIC void st7735_ST7735_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind)
 {
 	(void) kind;
-	st7789_ST7789_obj_t *self = MP_OBJ_TO_PTR(self_in);
-	mp_printf(print, "<ST7789 width=%u, height=%u, spi=%p>", self->width, self->height, self->spi_obj);
+	st7735_ST7735_obj_t *self = MP_OBJ_TO_PTR(self_in);
+	mp_printf(print, "<ST7735 width=%u, height=%u, spi=%p>", self->width, self->height, self->spi_obj);
 }
 
-STATIC void write_cmd(st7789_ST7789_obj_t *self, uint8_t cmd, const uint8_t *data, int len)
+STATIC void write_cmd(st7735_ST7735_obj_t *self, uint8_t cmd, const uint8_t *data, int len)
 {
 	CS_LOW()
 	if (cmd) {
@@ -146,7 +227,19 @@ STATIC void write_cmd(st7789_ST7789_obj_t *self, uint8_t cmd, const uint8_t *dat
 	CS_HIGH()
 }
 
-STATIC void set_window(st7789_ST7789_obj_t *self, uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1)
+STATIC void send_command(st7735_ST7735_obj_t *self, const st7735_cmd_t *cmds)
+{
+	int count = 0;
+	while (cmds[count].databytes != 0xff) {
+		write_cmd(self, cmds[count].cmd, cmds[count].data, cmds[count].databytes);
+		if (cmds[count].databytes & 0x80) {
+			mp_hal_delay_ms(100);
+		}
+		count++;
+	}
+}
+
+STATIC void set_window(st7735_ST7735_obj_t *self, uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1)
 {
 	if (x0 > x1 || x1 >= self->width) {
 		return;
@@ -168,9 +261,9 @@ STATIC void set_window(st7789_ST7789_obj_t *self, uint16_t x0, uint16_t y0, uint
 
 	uint8_t bufx[4] = {(x0 + self->colstart) >> 8, (x0 + self->colstart) & 0xFF, (x1 + self->colstart) >> 8, (x1 + self->colstart) & 0xFF};
 	uint8_t bufy[4] = {(y0 + self->rowstart) >> 8, (y0 + self->rowstart) & 0xFF, (y1 + self->rowstart) >> 8, (y1 + self->rowstart) & 0xFF};
-	write_cmd(self, ST7789_CASET, bufx, 4);
-	write_cmd(self, ST7789_RASET, bufy, 4);
-	write_cmd(self, ST7789_RAMWR, NULL, 0);
+	write_cmd(self, ST7735_CASET, bufx, 4);
+	write_cmd(self, ST7735_RASET, bufy, 4);
+	write_cmd(self, ST7735_RAMWR, NULL, 0);
 }
 
 STATIC void fill_color_buffer(mp_obj_base_t *spi_obj, uint16_t color, int length)
@@ -196,15 +289,16 @@ STATIC void fill_color_buffer(mp_obj_base_t *spi_obj, uint16_t color, int length
 	}
 }
 
-int mod(int x, int m) {
-    int r = x % m;
-    return (r < 0) ? r + m : r;
+int mod(int x, int m)
+{
+	int r = x % m;
+	return (r < 0) ? r + m : r;
 }
 
-void draw_pixel(st7789_ST7789_obj_t *self, int16_t x, int16_t y, uint16_t color)
+void draw_pixel(st7735_ST7735_obj_t *self, int16_t x, int16_t y, uint16_t color)
 {
 	if ((self->options & OPTIONS_WRAP)) {
-		if ((self->options & OPTIONS_WRAP_H) &&  ((x >= self->width) || (x < 0)))
+		if ((self->options & OPTIONS_WRAP_H) && ((x >= self->width) || (x < 0)))
 			x = mod(x, self->width);
 		if ((self->options & OPTIONS_WRAP_V) && ((y >= self->height) || (y < 0)))
 			y = mod(y, self->height);
@@ -221,7 +315,7 @@ void draw_pixel(st7789_ST7789_obj_t *self, int16_t x, int16_t y, uint16_t color)
 	}
 }
 
-void fast_hline(st7789_ST7789_obj_t *self, int16_t x, int16_t y, int16_t w, uint16_t color)
+void fast_hline(st7735_ST7735_obj_t *self, int16_t x, int16_t y, int16_t w, uint16_t color)
 {
 	if ((self->options & OPTIONS_WRAP) == 0) {
 		if (y >= 0 && self->width > x && self->height > y) {
@@ -244,13 +338,13 @@ void fast_hline(st7789_ST7789_obj_t *self, int16_t x, int16_t y, int16_t w, uint
 			}
 		}
 	} else {
-		for(int d=0; d<w; d++) {
+		for (int d = 0; d < w; d++) {
 			draw_pixel(self, x + d, y, color);
 		}
 	}
 }
 
-STATIC void fast_vline(st7789_ST7789_obj_t *self, int16_t x, int16_t y, int16_t h, uint16_t color)
+STATIC void fast_vline(st7735_ST7735_obj_t *self, int16_t x, int16_t y, int16_t h, uint16_t color)
 {
 	if ((self->options & OPTIONS_WRAP) == 0) {
 		if (x >= 0 && self->width > x && self->height > y) {
@@ -280,9 +374,9 @@ STATIC void fast_vline(st7789_ST7789_obj_t *self, int16_t x, int16_t y, int16_t 
 	}
 }
 
-STATIC mp_obj_t st7789_ST7789_hard_reset(mp_obj_t self_in)
+STATIC mp_obj_t st7735_ST7735_hard_reset(mp_obj_t self_in)
 {
-	st7789_ST7789_obj_t *self = MP_OBJ_TO_PTR(self_in);
+	st7735_ST7735_obj_t *self = MP_OBJ_TO_PTR(self_in);
 
 	CS_LOW();
 	RESET_HIGH();
@@ -294,47 +388,47 @@ STATIC mp_obj_t st7789_ST7789_hard_reset(mp_obj_t self_in)
 	CS_HIGH();
 	return mp_const_none;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(st7789_ST7789_hard_reset_obj, st7789_ST7789_hard_reset);
+STATIC MP_DEFINE_CONST_FUN_OBJ_1(st7735_ST7735_hard_reset_obj, st7735_ST7735_hard_reset);
 
-STATIC mp_obj_t st7789_ST7789_soft_reset(mp_obj_t self_in)
+STATIC mp_obj_t st7735_ST7735_soft_reset(mp_obj_t self_in)
 {
-	st7789_ST7789_obj_t *self = MP_OBJ_TO_PTR(self_in);
+	st7735_ST7735_obj_t *self = MP_OBJ_TO_PTR(self_in);
 
-	write_cmd(self, ST7789_SWRESET, NULL, 0);
+	write_cmd(self, ST7735_SWRESET, NULL, 0);
 	mp_hal_delay_ms(150);
 	return mp_const_none;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(st7789_ST7789_soft_reset_obj, st7789_ST7789_soft_reset);
+STATIC MP_DEFINE_CONST_FUN_OBJ_1(st7735_ST7735_soft_reset_obj, st7735_ST7735_soft_reset);
 
-STATIC mp_obj_t st7789_ST7789_sleep_mode(mp_obj_t self_in, mp_obj_t value)
+STATIC mp_obj_t st7735_ST7735_sleep_mode(mp_obj_t self_in, mp_obj_t value)
 {
-	st7789_ST7789_obj_t *self = MP_OBJ_TO_PTR(self_in);
+	st7735_ST7735_obj_t *self = MP_OBJ_TO_PTR(self_in);
 	if (mp_obj_is_true(value)) {
-		write_cmd(self, ST7789_SLPIN, NULL, 0);
+		write_cmd(self, ST7735_SLPIN, NULL, 0);
 	} else {
-		write_cmd(self, ST7789_SLPOUT, NULL, 0);
+		write_cmd(self, ST7735_SLPOUT, NULL, 0);
 	}
 	return mp_const_none;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_2(st7789_ST7789_sleep_mode_obj, st7789_ST7789_sleep_mode);
+STATIC MP_DEFINE_CONST_FUN_OBJ_2(st7735_ST7735_sleep_mode_obj, st7735_ST7735_sleep_mode);
 
-STATIC mp_obj_t st7789_ST7789_inversion_mode(mp_obj_t self_in, mp_obj_t value)
+STATIC mp_obj_t st7735_ST7735_inversion_mode(mp_obj_t self_in, mp_obj_t value)
 {
-	st7789_ST7789_obj_t *self = MP_OBJ_TO_PTR(self_in);
+	st7735_ST7735_obj_t *self = MP_OBJ_TO_PTR(self_in);
 
 	self->inversion = mp_obj_is_true(value);
 	if (self->inversion) {
-		write_cmd(self, ST7789_INVON, NULL, 0);
+		write_cmd(self, ST7735_INVON, NULL, 0);
 	} else {
-		write_cmd(self, ST7789_INVOFF, NULL, 0);
+		write_cmd(self, ST7735_INVOFF, NULL, 0);
 	}
 	return mp_const_none;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_2(st7789_ST7789_inversion_mode_obj, st7789_ST7789_inversion_mode);
+STATIC MP_DEFINE_CONST_FUN_OBJ_2(st7735_ST7735_inversion_mode_obj, st7735_ST7735_inversion_mode);
 
-STATIC mp_obj_t st7789_ST7789_fill_rect(size_t n_args, const mp_obj_t *args)
+STATIC mp_obj_t st7735_ST7735_fill_rect(size_t n_args, const mp_obj_t *args)
 {
-	st7789_ST7789_obj_t *self  = MP_OBJ_TO_PTR(args[0]);
+	st7735_ST7735_obj_t *self  = MP_OBJ_TO_PTR(args[0]);
 	mp_int_t			 x	   = mp_obj_get_int(args[1]);
 	mp_int_t			 y	   = mp_obj_get_int(args[2]);
 	mp_int_t			 w	   = mp_obj_get_int(args[3]);
@@ -359,11 +453,11 @@ STATIC mp_obj_t st7789_ST7789_fill_rect(size_t n_args, const mp_obj_t *args)
 	}
 	return mp_const_none;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(st7789_ST7789_fill_rect_obj, 6, 6, st7789_ST7789_fill_rect);
+STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(st7735_ST7735_fill_rect_obj, 6, 6, st7735_ST7735_fill_rect);
 
-STATIC mp_obj_t st7789_ST7789_fill(mp_obj_t self_in, mp_obj_t _color)
+STATIC mp_obj_t st7735_ST7735_fill(mp_obj_t self_in, mp_obj_t _color)
 {
-	st7789_ST7789_obj_t *self  = MP_OBJ_TO_PTR(self_in);
+	st7735_ST7735_obj_t *self  = MP_OBJ_TO_PTR(self_in);
 	mp_int_t			 color = mp_obj_get_int(_color);
 
 	set_window(self, 0, 0, self->width - 1, self->height - 1);
@@ -374,11 +468,11 @@ STATIC mp_obj_t st7789_ST7789_fill(mp_obj_t self_in, mp_obj_t _color)
 
 	return mp_const_none;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_2(st7789_ST7789_fill_obj, st7789_ST7789_fill);
+STATIC MP_DEFINE_CONST_FUN_OBJ_2(st7735_ST7735_fill_obj, st7735_ST7735_fill);
 
-STATIC mp_obj_t st7789_ST7789_pixel(size_t n_args, const mp_obj_t *args)
+STATIC mp_obj_t st7735_ST7735_pixel(size_t n_args, const mp_obj_t *args)
 {
-	st7789_ST7789_obj_t *self  = MP_OBJ_TO_PTR(args[0]);
+	st7735_ST7735_obj_t *self  = MP_OBJ_TO_PTR(args[0]);
 	mp_int_t			 x	   = mp_obj_get_int(args[1]);
 	mp_int_t			 y	   = mp_obj_get_int(args[2]);
 	mp_int_t			 color = mp_obj_get_int(args[3]);
@@ -387,9 +481,9 @@ STATIC mp_obj_t st7789_ST7789_pixel(size_t n_args, const mp_obj_t *args)
 
 	return mp_const_none;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(st7789_ST7789_pixel_obj, 4, 4, st7789_ST7789_pixel);
+STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(st7735_ST7735_pixel_obj, 4, 4, st7735_ST7735_pixel);
 
-STATIC void line(st7789_ST7789_obj_t *self, int16_t x0, int16_t y0, int16_t x1, int16_t y1, int16_t color)
+STATIC void line(st7735_ST7735_obj_t *self, int16_t x0, int16_t y0, int16_t x1, int16_t y1, int16_t color)
 {
 	bool steep = ABS(y1 - y0) > ABS(x1 - x0);
 	if (steep) {
@@ -446,9 +540,9 @@ STATIC void line(st7789_ST7789_obj_t *self, int16_t x0, int16_t y0, int16_t x1, 
 	}
 }
 
-STATIC mp_obj_t st7789_ST7789_line(size_t n_args, const mp_obj_t *args)
+STATIC mp_obj_t st7735_ST7735_line(size_t n_args, const mp_obj_t *args)
 {
-	st7789_ST7789_obj_t *self  = MP_OBJ_TO_PTR(args[0]);
+	st7735_ST7735_obj_t *self  = MP_OBJ_TO_PTR(args[0]);
 	mp_int_t			 x0	   = mp_obj_get_int(args[1]);
 	mp_int_t			 y0	   = mp_obj_get_int(args[2]);
 	mp_int_t			 x1	   = mp_obj_get_int(args[3]);
@@ -459,11 +553,11 @@ STATIC mp_obj_t st7789_ST7789_line(size_t n_args, const mp_obj_t *args)
 
 	return mp_const_none;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(st7789_ST7789_line_obj, 6, 6, st7789_ST7789_line);
+STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(st7735_ST7735_line_obj, 6, 6, st7735_ST7735_line);
 
-STATIC mp_obj_t st7789_ST7789_blit_buffer(size_t n_args, const mp_obj_t *args)
+STATIC mp_obj_t st7735_ST7735_blit_buffer(size_t n_args, const mp_obj_t *args)
 {
-	st7789_ST7789_obj_t *self = MP_OBJ_TO_PTR(args[0]);
+	st7735_ST7735_obj_t *self = MP_OBJ_TO_PTR(args[0]);
 	mp_buffer_info_t	 buf_info;
 	mp_get_buffer_raise(args[1], &buf_info, MP_BUFFER_READ);
 	mp_int_t x = mp_obj_get_int(args[2]);
@@ -490,14 +584,13 @@ STATIC mp_obj_t st7789_ST7789_blit_buffer(size_t n_args, const mp_obj_t *args)
 
 	return mp_const_none;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(st7789_ST7789_blit_buffer_obj, 6, 6, st7789_ST7789_blit_buffer);
+STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(st7735_ST7735_blit_buffer_obj, 6, 6, st7735_ST7735_blit_buffer);
 
-
-STATIC mp_obj_t st7789_ST7789_draw(size_t n_args, const mp_obj_t *args)
+STATIC mp_obj_t st7735_ST7735_draw(size_t n_args, const mp_obj_t *args)
 {
-	st7789_ST7789_obj_t *self			 = MP_OBJ_TO_PTR(args[0]);
+	st7735_ST7735_obj_t *self			 = MP_OBJ_TO_PTR(args[0]);
 	char				 single_char_s[] = {0, 0};
-	const char *		 s;
+	const char		   *s;
 
 	mp_obj_module_t *hershey = MP_OBJ_TO_PTR(args[1]);
 
@@ -524,13 +617,13 @@ STATIC mp_obj_t st7789_ST7789_draw(size_t n_args, const mp_obj_t *args)
 		}
 	}
 
-	mp_obj_dict_t *	 dict			 = MP_OBJ_TO_PTR(hershey->globals);
-	mp_obj_t *		 index_data_buff = mp_obj_dict_get(dict, MP_OBJ_NEW_QSTR(MP_QSTR_INDEX));
+	mp_obj_dict_t	  *dict			 = MP_OBJ_TO_PTR(hershey->globals);
+	mp_obj_t		 *index_data_buff = mp_obj_dict_get(dict, MP_OBJ_NEW_QSTR(MP_QSTR_INDEX));
 	mp_buffer_info_t index_bufinfo;
 	mp_get_buffer_raise(index_data_buff, &index_bufinfo, MP_BUFFER_READ);
 	uint8_t *index = index_bufinfo.buf;
 
-	mp_obj_t *		 font_data_buff = mp_obj_dict_get(dict, MP_OBJ_NEW_QSTR(MP_QSTR_FONT));
+	mp_obj_t		 *font_data_buff = mp_obj_dict_get(dict, MP_OBJ_NEW_QSTR(MP_QSTR_FONT));
 	mp_buffer_info_t font_bufinfo;
 	mp_get_buffer_raise(font_data_buff, &font_bufinfo, MP_BUFFER_READ);
 	int8_t *font = font_bufinfo.buf;
@@ -587,19 +680,19 @@ STATIC mp_obj_t st7789_ST7789_draw(size_t n_args, const mp_obj_t *args)
 
 	return mp_const_none;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(st7789_ST7789_draw_obj, 5, 7, st7789_ST7789_draw);
+STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(st7735_ST7735_draw_obj, 5, 7, st7735_ST7735_draw);
 
-STATIC mp_obj_t st7789_ST7789_draw_len(size_t n_args, const mp_obj_t *args)
+STATIC mp_obj_t st7735_ST7735_draw_len(size_t n_args, const mp_obj_t *args)
 {
-	char single_char_s[] = {0, 0};
+	char		single_char_s[] = {0, 0};
 	const char *s;
 
 	mp_obj_module_t *hershey = MP_OBJ_TO_PTR(args[1]);
 
 	if (mp_obj_is_int(args[2])) {
-		mp_int_t c = mp_obj_get_int(args[2]);
+		mp_int_t c		 = mp_obj_get_int(args[2]);
 		single_char_s[0] = c & 0xff;
-		s = single_char_s;
+		s				 = single_char_s;
 	} else {
 		s = mp_obj_str_get_str(args[2]);
 	}
@@ -614,26 +707,26 @@ STATIC mp_obj_t st7789_ST7789_draw_len(size_t n_args, const mp_obj_t *args)
 		}
 	}
 
-	mp_obj_dict_t *dict = MP_OBJ_TO_PTR(hershey->globals);
-	mp_obj_t * index_data_buff = mp_obj_dict_get(dict, MP_OBJ_NEW_QSTR(MP_QSTR_INDEX));
+	mp_obj_dict_t	  *dict			 = MP_OBJ_TO_PTR(hershey->globals);
+	mp_obj_t		 *index_data_buff = mp_obj_dict_get(dict, MP_OBJ_NEW_QSTR(MP_QSTR_INDEX));
 	mp_buffer_info_t index_bufinfo;
 	mp_get_buffer_raise(index_data_buff, &index_bufinfo, MP_BUFFER_READ);
 	uint8_t *index = index_bufinfo.buf;
 
-	mp_obj_t * font_data_buff = mp_obj_dict_get(dict, MP_OBJ_NEW_QSTR(MP_QSTR_FONT));
+	mp_obj_t		 *font_data_buff = mp_obj_dict_get(dict, MP_OBJ_NEW_QSTR(MP_QSTR_FONT));
 	mp_buffer_info_t font_bufinfo;
 	mp_get_buffer_raise(font_data_buff, &font_bufinfo, MP_BUFFER_READ);
 	int8_t *font = font_bufinfo.buf;
 
 	int16_t print_width = 0;
-	char c;
+	char	c;
 	int16_t ii;
 
 	while ((c = *s++)) {
 		if (c >= 32 && c <= 127) {
 			ii = (c - 32) * 2;
 
-			int16_t offset = (index[ii] | (index[ii + 1] << 8)) +1;
+			int16_t offset = (index[ii] | (index[ii + 1] << 8)) + 1;
 			int16_t left   = (int) (scale * (font[offset++] - 0x52) + 0.5);
 			int16_t right  = (int) (scale * (font[offset++] - 0x52) + 0.5);
 			int16_t width  = right - left;
@@ -641,13 +734,12 @@ STATIC mp_obj_t st7789_ST7789_draw_len(size_t n_args, const mp_obj_t *args)
 		}
 	}
 
-	return mp_obj_new_int((int)(print_width * scale));
+	return mp_obj_new_int((int) (print_width * scale));
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(st7789_ST7789_draw_len_obj, 3, 4, st7789_ST7789_draw_len);
-
+STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(st7735_ST7735_draw_len_obj, 3, 4, st7735_ST7735_draw_len);
 
 STATIC uint32_t bs_bit		= 0;
-uint8_t *		bitmap_data = NULL;
+uint8_t		*bitmap_data = NULL;
 
 STATIC uint8_t get_color(uint8_t bpp)
 {
@@ -673,10 +765,10 @@ STATIC mp_obj_t dict_lookup(mp_obj_t self_in, mp_obj_t index)
 	}
 }
 
-STATIC mp_obj_t st7789_ST7789_write_len(size_t n_args, const mp_obj_t *args)
+STATIC mp_obj_t st7735_ST7735_write_len(size_t n_args, const mp_obj_t *args)
 {
 	mp_obj_module_t *font			  = MP_OBJ_TO_PTR(args[1]);
-	mp_obj_dict_t *	 dict			  = MP_OBJ_TO_PTR(font->globals);
+	mp_obj_dict_t	  *dict			  = MP_OBJ_TO_PTR(font->globals);
 	mp_obj_t		 widths_data_buff = mp_obj_dict_get(dict, MP_OBJ_NEW_QSTR(MP_QSTR_WIDTHS));
 	mp_buffer_info_t widths_bufinfo;
 	mp_get_buffer_raise(widths_data_buff, &widths_bufinfo, MP_BUFFER_READ);
@@ -695,7 +787,7 @@ STATIC mp_obj_t st7789_ST7789_write_len(size_t n_args, const mp_obj_t *args)
 		s  = utf8_next_char(s);
 
 		const byte *map_s = map_data, *map_top = map_data + map_len;
-		uint16_t char_index = 0;
+		uint16_t	char_index = 0;
 
 		while (map_s < map_top) {
 			unichar map_ch;
@@ -712,17 +804,17 @@ STATIC mp_obj_t st7789_ST7789_write_len(size_t n_args, const mp_obj_t *args)
 
 	return mp_obj_new_int(print_width);
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(st7789_ST7789_write_len_obj, 3, 3, st7789_ST7789_write_len);
+STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(st7735_ST7735_write_len_obj, 3, 3, st7735_ST7735_write_len);
 
 //
 //	write(font_module, s, x, y[, fg, bg, background_tuple, fill])
 //		background_tuple (bitmap_buffer, width, height)
 //
 
-STATIC mp_obj_t st7789_ST7789_write(size_t n_args, const mp_obj_t *args)
+STATIC mp_obj_t st7735_ST7735_write(size_t n_args, const mp_obj_t *args)
 {
-	st7789_ST7789_obj_t *self = MP_OBJ_TO_PTR(args[0]);
-	mp_obj_module_t *font = MP_OBJ_TO_PTR(args[1]);
+	st7735_ST7735_obj_t *self = MP_OBJ_TO_PTR(args[0]);
+	mp_obj_module_t		*font = MP_OBJ_TO_PTR(args[1]);
 
 	mp_int_t x = mp_obj_get_int(args[3]);
 	mp_int_t y = mp_obj_get_int(args[4]);
@@ -732,43 +824,43 @@ STATIC mp_obj_t st7789_ST7789_write(size_t n_args, const mp_obj_t *args)
 	fg_color = (n_args > 5) ? _swap_bytes(mp_obj_get_int(args[5])) : _swap_bytes(WHITE);
 	bg_color = (n_args > 6) ? _swap_bytes(mp_obj_get_int(args[6])) : _swap_bytes(BLACK);
 
-    mp_obj_t *tuple_data = NULL;
-	size_t tuple_len = 0;
+	mp_obj_t *tuple_data = NULL;
+	size_t	  tuple_len	 = 0;
 
 	mp_buffer_info_t background_bufinfo;
-	uint16_t background_width = 0;
-	uint16_t background_height = 0;
-	uint16_t *background_data = NULL;
+	uint16_t		 background_width  = 0;
+	uint16_t		 background_height = 0;
+	uint16_t		 *background_data   = NULL;
 
-    if (n_args > 7) {
-	    mp_obj_tuple_get(args[7], &tuple_len, &tuple_data);
+	if (n_args > 7) {
+		mp_obj_tuple_get(args[7], &tuple_len, &tuple_data);
 		if (tuple_len > 2) {
 			mp_get_buffer_raise(tuple_data[0], &background_bufinfo, MP_BUFFER_READ);
-			background_data = background_bufinfo.buf;
-        	background_width = mp_obj_get_int(tuple_data[1]);
-        	background_height = mp_obj_get_int(tuple_data[2]);
+			background_data	  = background_bufinfo.buf;
+			background_width  = mp_obj_get_int(tuple_data[1]);
+			background_height = mp_obj_get_int(tuple_data[2]);
 		}
 	}
 
 	bool fill = (n_args > 8) ? mp_obj_is_true(args[8]) : false;
 
-	mp_obj_dict_t *dict	= MP_OBJ_TO_PTR(font->globals);
-	const uint8_t  bpp = mp_obj_get_int(mp_obj_dict_get(dict, MP_OBJ_NEW_QSTR(MP_QSTR_BPP)));
-	const uint8_t  height = mp_obj_get_int(mp_obj_dict_get(dict, MP_OBJ_NEW_QSTR(MP_QSTR_HEIGHT)));
+	mp_obj_dict_t *dict			= MP_OBJ_TO_PTR(font->globals);
+	const uint8_t  bpp			= mp_obj_get_int(mp_obj_dict_get(dict, MP_OBJ_NEW_QSTR(MP_QSTR_BPP)));
+	const uint8_t  height		= mp_obj_get_int(mp_obj_dict_get(dict, MP_OBJ_NEW_QSTR(MP_QSTR_HEIGHT)));
 	const uint8_t  offset_width = mp_obj_get_int(mp_obj_dict_get(dict, MP_OBJ_NEW_QSTR(MP_QSTR_OFFSET_WIDTH)));
-	const uint8_t  max_width = mp_obj_get_int(mp_obj_dict_get(dict, MP_OBJ_NEW_QSTR(MP_QSTR_MAX_WIDTH)));
+	const uint8_t  max_width	= mp_obj_get_int(mp_obj_dict_get(dict, MP_OBJ_NEW_QSTR(MP_QSTR_MAX_WIDTH)));
 
-	mp_obj_t widths_data_buff = mp_obj_dict_get(dict, MP_OBJ_NEW_QSTR(MP_QSTR_WIDTHS));
+	mp_obj_t		 widths_data_buff = mp_obj_dict_get(dict, MP_OBJ_NEW_QSTR(MP_QSTR_WIDTHS));
 	mp_buffer_info_t widths_bufinfo;
 	mp_get_buffer_raise(widths_data_buff, &widths_bufinfo, MP_BUFFER_READ);
 	const uint8_t *widths_data = widths_bufinfo.buf;
 
-	mp_obj_t offsets_data_buff = mp_obj_dict_get(dict, MP_OBJ_NEW_QSTR(MP_QSTR_OFFSETS));
+	mp_obj_t		 offsets_data_buff = mp_obj_dict_get(dict, MP_OBJ_NEW_QSTR(MP_QSTR_OFFSETS));
 	mp_buffer_info_t offsets_bufinfo;
 	mp_get_buffer_raise(offsets_data_buff, &offsets_bufinfo, MP_BUFFER_READ);
 	const uint8_t *offsets_data = offsets_bufinfo.buf;
 
-	mp_obj_t bitmaps_data_buff = mp_obj_dict_get(dict, MP_OBJ_NEW_QSTR(MP_QSTR_BITMAPS));
+	mp_obj_t		 bitmaps_data_buff = mp_obj_dict_get(dict, MP_OBJ_NEW_QSTR(MP_QSTR_BITMAPS));
 	mp_buffer_info_t bitmaps_bufinfo;
 	mp_get_buffer_raise(bitmaps_data_buff, &bitmaps_bufinfo, MP_BUFFER_READ);
 	bitmap_data = bitmaps_bufinfo.buf;
@@ -790,7 +882,7 @@ STATIC mp_obj_t st7789_ST7789_write(size_t n_args, const mp_obj_t *args)
 	}
 
 	uint16_t print_width = 0;
-	mp_obj_t map_obj = mp_obj_dict_get(dict, MP_OBJ_NEW_QSTR(MP_QSTR_MAP));
+	mp_obj_t map_obj	 = mp_obj_dict_get(dict, MP_OBJ_NEW_QSTR(MP_QSTR_MAP));
 	GET_STR_DATA_LEN(map_obj, map_data, map_len);
 	GET_STR_DATA_LEN(args[2], str_data, str_len);
 	const byte *s = str_data, *top = str_data + str_len;
@@ -800,12 +892,12 @@ STATIC mp_obj_t st7789_ST7789_write(size_t n_args, const mp_obj_t *args)
 		s  = utf8_next_char(s);
 
 		const byte *map_s = map_data, *map_top = map_data + map_len;
-		uint16_t char_index = 0;
+		uint16_t	char_index = 0;
 
 		while (map_s < map_top) {
 			unichar map_ch;
 			map_ch = utf8_get_char(map_s);
-			map_s = utf8_next_char(map_s);
+			map_s  = utf8_next_char(map_s);
 
 			if (ch == map_ch) {
 				uint8_t width = widths_data[char_index];
@@ -833,7 +925,7 @@ STATIC mp_obj_t st7789_ST7789_write(size_t n_args, const mp_obj_t *args)
 				uint16_t color = 0;
 				for (uint16_t yy = 0; yy < height; yy++) {
 					for (uint16_t xx = 0; xx < width; xx++) {
-						if (background_data && (xx <= background_width && yy <= background_height)){
+						if (background_data && (xx <= background_width && yy <= background_height)) {
 							if (get_color(bpp) == bg_color) {
 								color = background_data[(yy * background_width + xx)];
 							} else {
@@ -842,13 +934,13 @@ STATIC mp_obj_t st7789_ST7789_write(size_t n_args, const mp_obj_t *args)
 						} else {
 							color = get_color(bpp) ? fg_color : bg_color;
 						}
-						self->i2c_buffer[yy*buffer_width + xx] = color;
+						self->i2c_buffer[yy * buffer_width + xx] = color;
 					}
 				}
 
 				uint32_t data_size = buffer_width * height * 2;
-				uint16_t x2	= x + buffer_width - 1;
-				uint16_t y2 = y + height - 1;
+				uint16_t x2		   = x + buffer_width - 1;
+				uint16_t y2		   = y + height - 1;
 				if (x2 < self->width) {
 					set_window(self, x, y, x2, y2);
 					DC_HIGH();
@@ -870,11 +962,11 @@ STATIC mp_obj_t st7789_ST7789_write(size_t n_args, const mp_obj_t *args)
 
 	return mp_obj_new_int(print_width);
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(st7789_ST7789_write_obj, 5, 9, st7789_ST7789_write);
+STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(st7735_ST7735_write_obj, 5, 9, st7735_ST7735_write);
 
-STATIC mp_obj_t st7789_ST7789_bitmap(size_t n_args, const mp_obj_t *args)
+STATIC mp_obj_t st7735_ST7735_bitmap(size_t n_args, const mp_obj_t *args)
 {
-	st7789_ST7789_obj_t *self = MP_OBJ_TO_PTR(args[0]);
+	st7735_ST7735_obj_t *self = MP_OBJ_TO_PTR(args[0]);
 
 	mp_obj_module_t *bitmap = MP_OBJ_TO_PTR(args[1]);
 	mp_int_t		 x		= mp_obj_get_int(args[2]);
@@ -892,8 +984,8 @@ STATIC mp_obj_t st7789_ST7789_bitmap(size_t n_args, const mp_obj_t *args)
 	const uint16_t width	   = mp_obj_get_int(mp_obj_dict_get(dict, MP_OBJ_NEW_QSTR(MP_QSTR_WIDTH)));
 	uint16_t	   bitmaps	   = 0;
 	const uint8_t  bpp		   = mp_obj_get_int(mp_obj_dict_get(dict, MP_OBJ_NEW_QSTR(MP_QSTR_BPP)));
-	mp_obj_t *	   palette_arg = mp_obj_dict_get(dict, MP_OBJ_NEW_QSTR(MP_QSTR_PALETTE));
-	mp_obj_t *	   palette	   = NULL;
+	mp_obj_t		 *palette_arg = mp_obj_dict_get(dict, MP_OBJ_NEW_QSTR(MP_QSTR_PALETTE));
+	mp_obj_t		 *palette	   = NULL;
 	size_t		   palette_len = 0;
 
 	mp_map_elem_t *elem = dict_lookup(bitmap->globals, MP_OBJ_NEW_QSTR(MP_QSTR_BITMAPS));
@@ -903,7 +995,7 @@ STATIC mp_obj_t st7789_ST7789_bitmap(size_t n_args, const mp_obj_t *args)
 
 	mp_obj_get_array(palette_arg, &palette_len, &palette);
 
-	mp_obj_t *		 bitmap_data_buff = mp_obj_dict_get(dict, MP_OBJ_NEW_QSTR(MP_QSTR_BITMAP));
+	mp_obj_t		 *bitmap_data_buff = mp_obj_dict_get(dict, MP_OBJ_NEW_QSTR(MP_QSTR_BITMAP));
 	mp_buffer_info_t bufinfo;
 
 	mp_get_buffer_raise(bitmap_data_buff, &bufinfo, MP_BUFFER_READ);
@@ -945,16 +1037,16 @@ STATIC mp_obj_t st7789_ST7789_bitmap(size_t n_args, const mp_obj_t *args)
 	return mp_const_none;
 }
 
-STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(st7789_ST7789_bitmap_obj, 4, 5, st7789_ST7789_bitmap);
+STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(st7735_ST7735_bitmap_obj, 4, 5, st7735_ST7735_bitmap);
 
-STATIC mp_obj_t st7789_ST7789_text(size_t n_args, const mp_obj_t *args)
+STATIC mp_obj_t st7735_ST7735_text(size_t n_args, const mp_obj_t *args)
 {
 	char		single_char_s[2] = {0, 0};
 	const char *str;
 
 	// extract arguments
-	st7789_ST7789_obj_t *self = MP_OBJ_TO_PTR(args[0]);
-	mp_obj_module_t *	 font = MP_OBJ_TO_PTR(args[1]);
+	st7735_ST7735_obj_t *self = MP_OBJ_TO_PTR(args[0]);
+	mp_obj_module_t		*font = MP_OBJ_TO_PTR(args[1]);
 
 	if (mp_obj_is_int(args[2])) {
 		mp_int_t c		 = mp_obj_get_int(args[2]);
@@ -990,8 +1082,8 @@ STATIC mp_obj_t st7789_ST7789_text(size_t n_args, const mp_obj_t *args)
 	else
 		bg_color = _swap_bytes(BLACK);
 
-	uint8_t	wide	= width / 8;
-	size_t buf_size = width * height * 2;
+	uint8_t wide	 = width / 8;
+	size_t	buf_size = width * height * 2;
 
 	if (self->buffer_size == 0) {
 		self->i2c_buffer = m_malloc(buf_size);
@@ -1034,42 +1126,68 @@ STATIC mp_obj_t st7789_ST7789_text(size_t n_args, const mp_obj_t *args)
 	return mp_const_none;
 }
 
-STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(st7789_ST7789_text_obj, 5, 7, st7789_ST7789_text);
-
+STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(st7735_ST7735_text_obj, 5, 7, st7735_ST7735_text);
 
 // 0=Portrait, 1=Landscape, 2=Reverse Portrait (180), 3=Reverse Landscape (180)
 
-STATIC void set_rotation(st7789_ST7789_obj_t *self)
+STATIC void set_rotation(st7735_ST7735_obj_t *self)
 {
 	uint8_t madctl_value = self->color_order;
 
 	if (self->rotation > self->rotations_len) {
 		mp_raise_msg_varg(
 			&mp_type_RuntimeError,
-			MP_ERROR_TEXT("Invalid rotation value %d > %d"), self->rotation, self->rotations_len
-		);
+			MP_ERROR_TEXT("Invalid rotation value %d > %d"), self->rotation, self->rotations_len);
 	}
 
-	st7789_rotation_t *rotations = self->rotations;
+	st7735_rotation_t *rotations = self->rotations;
 	if (rotations == NULL) {
-		if (self->display_width == 240 && self->display_height == 320) {
-			rotations = ORIENTATIONS_240x320;
-		} else if  (self->display_width == 240 && self->display_height == 240) {
-			rotations = ORIENTATIONS_240x240;
-		} else if (self->display_width == 135 && self->display_height == 240) {
-			rotations = ORIENTATIONS_135x240;
-		} else if (self->display_width == 128 && self->display_height == 160) {
-			rotations = ORIENTATIONS_128x160;
-		} else if (self->display_width == 128 && self->display_height == 128) {
-			rotations = ORIENTATIONS_128x128;
+		switch(self->module)
+		{
+			case INITR_BLACKTAB:
+				rotations = ORIENTATIONS_INITR_BLACKTAB;
+				break;
+			case INITR_GREENTAB2:
+				rotations = ORIENTATIONS_INITR_GREENTAB2;
+				break;
+			case INITR_GREENTAB3:
+				rotations = ORIENTATIONS_INITR_GREENTAB3;
+				break;
+			case INITR_GREENTAB4:
+				rotations = ORIENTATIONS_INITR_GREENTAB4;
+				break;
+			case INITR_GREENTAB5:
+				rotations = ORIENTATIONS_INITR_GREENTAB5;
+				break;
+			case INITR_REDTAB2:
+				rotations = ORIENTATIONS_INITR_REDTAB2;
+				break;
+			case INITB:
+				rotations = ORIENTATIONS_INITB;
+				break;
+			default:
+				rotations = ORIENTATIONS_COM;
+				break;
 		}
 	}
 
 	if (rotations) {
-		st7789_rotation_t *rotation = &rotations[self->rotation];
+		st7735_rotation_t *rotation = &rotations[self->rotation];
 		madctl_value |= rotation->madctl;
-		self->width  = rotation->width;
-		self->height = rotation->height;
+		switch (self->rotation) {
+			case 0:
+			case 2:
+				self->width	 = self->display_width;
+				self->height = self->display_height;
+				break;
+			case 1:
+			case 3:
+				self->width	 = self->display_height;
+				self->height = self->display_width;
+				break;
+			default:
+				break;
+		}
 		self->colstart = rotation->colstart;
 		self->rowstart = rotation->rowstart;
 	}
@@ -1081,81 +1199,123 @@ STATIC void set_rotation(st7789_ST7789_obj_t *self)
 	self->max_y	 = 0;
 
 	const uint8_t madctl[] = {madctl_value};
-	write_cmd(self, ST7789_MADCTL, madctl, 1);
+	write_cmd(self, ST7735_MADCTL, madctl, 1);
 }
 
-STATIC mp_obj_t st7789_ST7789_rotation(mp_obj_t self_in, mp_obj_t value)
+STATIC mp_obj_t st7735_ST7735_rotation(mp_obj_t self_in, mp_obj_t value)
 {
-	st7789_ST7789_obj_t *self	  = MP_OBJ_TO_PTR(self_in);
+	st7735_ST7735_obj_t *self	  = MP_OBJ_TO_PTR(self_in);
 	mp_int_t			 rotation = mp_obj_get_int(value) % 4;
 	self->rotation				  = rotation;
 	set_rotation(self);
 	return mp_const_none;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_2(st7789_ST7789_rotation_obj, st7789_ST7789_rotation);
+STATIC MP_DEFINE_CONST_FUN_OBJ_2(st7735_ST7735_rotation_obj, st7735_ST7735_rotation);
 
-STATIC mp_obj_t st7789_ST7789_width(mp_obj_t self_in)
+STATIC mp_obj_t st7735_ST7735_width(mp_obj_t self_in)
 {
-	st7789_ST7789_obj_t *self = MP_OBJ_TO_PTR(self_in);
+	st7735_ST7735_obj_t *self = MP_OBJ_TO_PTR(self_in);
 	return mp_obj_new_int(self->width);
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(st7789_ST7789_width_obj, st7789_ST7789_width);
+STATIC MP_DEFINE_CONST_FUN_OBJ_1(st7735_ST7735_width_obj, st7735_ST7735_width);
 
-STATIC mp_obj_t st7789_ST7789_height(mp_obj_t self_in)
+STATIC mp_obj_t st7735_ST7735_height(mp_obj_t self_in)
 {
-	st7789_ST7789_obj_t *self = MP_OBJ_TO_PTR(self_in);
+	st7735_ST7735_obj_t *self = MP_OBJ_TO_PTR(self_in);
 	return mp_obj_new_int(self->height);
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(st7789_ST7789_height_obj, st7789_ST7789_height);
+STATIC MP_DEFINE_CONST_FUN_OBJ_1(st7735_ST7735_height_obj, st7735_ST7735_height);
 
-STATIC mp_obj_t st7789_ST7789_vscrdef(size_t n_args, const mp_obj_t *args)
+STATIC mp_obj_t st7735_ST7735_vscrdef(size_t n_args, const mp_obj_t *args)
 {
-	st7789_ST7789_obj_t *self = MP_OBJ_TO_PTR(args[0]);
+	st7735_ST7735_obj_t *self = MP_OBJ_TO_PTR(args[0]);
 	mp_int_t			 tfa  = mp_obj_get_int(args[1]);
 	mp_int_t			 vsa  = mp_obj_get_int(args[2]);
 	mp_int_t			 bfa  = mp_obj_get_int(args[3]);
 
 	uint8_t buf[6] = {(tfa) >> 8, (tfa) &0xFF, (vsa) >> 8, (vsa) &0xFF, (bfa) >> 8, (bfa) &0xFF};
-	write_cmd(self, ST7789_VSCRDEF, buf, 6);
+	write_cmd(self, ST7735_VSCRDEF, buf, 6);
 
 	return mp_const_none;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(st7789_ST7789_vscrdef_obj, 4, 4, st7789_ST7789_vscrdef);
+STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(st7735_ST7735_vscrdef_obj, 4, 4, st7735_ST7735_vscrdef);
 
-STATIC mp_obj_t st7789_ST7789_vscsad(mp_obj_t self_in, mp_obj_t vssa_in)
+STATIC mp_obj_t st7735_ST7735_vscsad(mp_obj_t self_in, mp_obj_t vssa_in)
 {
-	st7789_ST7789_obj_t *self = MP_OBJ_TO_PTR(self_in);
+	st7735_ST7735_obj_t *self = MP_OBJ_TO_PTR(self_in);
 	mp_int_t			 vssa = mp_obj_get_int(vssa_in);
 
 	uint8_t buf[2] = {(vssa) >> 8, (vssa) &0xFF};
-	write_cmd(self, ST7789_VSCSAD, buf, 2);
+	write_cmd(self, ST7735_VSCSAD, buf, 2);
 
 	return mp_const_none;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_2(st7789_ST7789_vscsad_obj, st7789_ST7789_vscsad);
+STATIC MP_DEFINE_CONST_FUN_OBJ_2(st7735_ST7735_vscsad_obj, st7735_ST7735_vscsad);
 
-STATIC mp_obj_t st7789_ST7789_init(mp_obj_t self_in)
+STATIC mp_obj_t st7735_ST7735_init(mp_obj_t self_in, mp_obj_t srceen_module_in)
 {
-	st7789_ST7789_obj_t *self = MP_OBJ_TO_PTR(self_in);
-	st7789_ST7789_hard_reset(self_in);
-	st7789_ST7789_soft_reset(self_in);
-	write_cmd(self, ST7789_SLPOUT, NULL, 0);
+	st7735_ST7735_obj_t *self = MP_OBJ_TO_PTR(self_in);
+	self->module			  = mp_obj_get_int(srceen_module_in);
+	self->width				  = self->display_width;
+	self->height			  = self->display_height;
 
-	const uint8_t color_mode[] = {COLOR_MODE_65K | COLOR_MODE_16BIT};
-	write_cmd(self, ST7789_COLMOD, color_mode, 1);
+	st7735_ST7735_hard_reset(self_in);
+	st7735_ST7735_soft_reset(self_in);
+	const uint8_t madctl[] = {0xc0 | self->color_order};
+	if (self->module == INITB) {
+		send_command(self, Bcmd);
+	} else {
+		send_command(self, Rcmd1);
+		switch (self->module) {
+			case INITR_GREENTAB:
+				send_command(self, Rcmd2green);
+				break;
+			case INITR_GREENTAB2:
+				send_command(self, Rcmd2green);
+				write_cmd(self, ST7735_MADCTL, madctl, 1);
+				break;
+			case INITR_GREENTAB3:
+				send_command(self, Rcmd2green);
+				break;
+			case INITR_GREENTAB4:
+				send_command(self, Rcmd2green);
+				break;
+			case INITR_GREENTAB5:
+				send_command(self, Rcmd2green);
+				write_cmd(self, ST7735_INVON, NULL, 0);
+				break;
+			case INITR_REDTAB2:
+				send_command(self, Rcmd2green);
+				break;
+			case INITR_REDTAB:
+				send_command(self, Rcmd2red);
+				break;
+			case INITR_BLACKTAB:
+				send_command(self, Rcmd1);
+				write_cmd(self, ST7735_MADCTL, madctl, 1);
+				break;
+			default:
+				break;
+		}
+		send_command(self, Rcmd3);
+	}
+
+	// write_cmd(self, ST7735_SLPOUT, NULL, 0);
+	// const uint8_t color_mode[] = {COLOR_MODE_65K | COLOR_MODE_16BIT};
+	// write_cmd(self, ST7735_COLMOD, color_mode, 1);
 	mp_hal_delay_ms(10);
 
 	set_rotation(self);
 
 	if (self->inversion) {
-		write_cmd(self, ST7789_INVON, NULL, 0);
+		write_cmd(self, ST7735_INVON, NULL, 0);
 	} else {
-		write_cmd(self, ST7789_INVOFF, NULL, 0);
+		write_cmd(self, ST7735_INVOFF, NULL, 0);
 	}
 
-	mp_hal_delay_ms(10);
-	write_cmd(self, ST7789_NORON, NULL, 0);
-	mp_hal_delay_ms(10);
+	// mp_hal_delay_ms(10);
+	// write_cmd(self, ST7735_NORON, NULL, 0);
+	// mp_hal_delay_ms(10);
 
 	const mp_obj_t args[] = {
 		self_in,
@@ -1164,21 +1324,21 @@ STATIC mp_obj_t st7789_ST7789_init(mp_obj_t self_in)
 		mp_obj_new_int(self->width),
 		mp_obj_new_int(self->height),
 		mp_obj_new_int(BLACK)};
-	st7789_ST7789_fill_rect(6, args);
+	st7735_ST7735_fill_rect(6, args);
 
 	if (self->backlight)
 		mp_hal_pin_write(self->backlight, 1);
 
-	write_cmd(self, ST7789_DISPON, NULL, 0);
+	write_cmd(self, ST7735_DISPON, NULL, 0);
 	mp_hal_delay_ms(150);
 
 	return mp_const_none;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(st7789_ST7789_init_obj, st7789_ST7789_init);
+STATIC MP_DEFINE_CONST_FUN_OBJ_2(st7735_ST7735_init_obj, st7735_ST7735_init);
 
-STATIC mp_obj_t st7789_ST7789_on(mp_obj_t self_in)
+STATIC mp_obj_t st7735_ST7735_on(mp_obj_t self_in)
 {
-	st7789_ST7789_obj_t *self = MP_OBJ_TO_PTR(self_in);
+	st7735_ST7735_obj_t *self = MP_OBJ_TO_PTR(self_in);
 
 	if (self->backlight) {
 		mp_hal_pin_write(self->backlight, 1);
@@ -1187,11 +1347,11 @@ STATIC mp_obj_t st7789_ST7789_on(mp_obj_t self_in)
 
 	return mp_const_none;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(st7789_ST7789_on_obj, st7789_ST7789_on);
+STATIC MP_DEFINE_CONST_FUN_OBJ_1(st7735_ST7735_on_obj, st7735_ST7735_on);
 
-STATIC mp_obj_t st7789_ST7789_off(mp_obj_t self_in)
+STATIC mp_obj_t st7735_ST7735_off(mp_obj_t self_in)
 {
-	st7789_ST7789_obj_t *self = MP_OBJ_TO_PTR(self_in);
+	st7735_ST7735_obj_t *self = MP_OBJ_TO_PTR(self_in);
 
 	if (self->backlight) {
 		mp_hal_pin_write(self->backlight, 0);
@@ -1200,11 +1360,11 @@ STATIC mp_obj_t st7789_ST7789_off(mp_obj_t self_in)
 
 	return mp_const_none;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(st7789_ST7789_off_obj, st7789_ST7789_off);
+STATIC MP_DEFINE_CONST_FUN_OBJ_1(st7735_ST7735_off_obj, st7735_ST7735_off);
 
-STATIC mp_obj_t st7789_ST7789_hline(size_t n_args, const mp_obj_t *args)
+STATIC mp_obj_t st7735_ST7735_hline(size_t n_args, const mp_obj_t *args)
 {
-	st7789_ST7789_obj_t *self  = MP_OBJ_TO_PTR(args[0]);
+	st7735_ST7735_obj_t *self  = MP_OBJ_TO_PTR(args[0]);
 	mp_int_t			 x	   = mp_obj_get_int(args[1]);
 	mp_int_t			 y	   = mp_obj_get_int(args[2]);
 	mp_int_t			 w	   = mp_obj_get_int(args[3]);
@@ -1214,11 +1374,11 @@ STATIC mp_obj_t st7789_ST7789_hline(size_t n_args, const mp_obj_t *args)
 
 	return mp_const_none;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(st7789_ST7789_hline_obj, 5, 5, st7789_ST7789_hline);
+STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(st7735_ST7735_hline_obj, 5, 5, st7735_ST7735_hline);
 
-STATIC mp_obj_t st7789_ST7789_vline(size_t n_args, const mp_obj_t *args)
+STATIC mp_obj_t st7735_ST7735_vline(size_t n_args, const mp_obj_t *args)
 {
-	st7789_ST7789_obj_t *self  = MP_OBJ_TO_PTR(args[0]);
+	st7735_ST7735_obj_t *self  = MP_OBJ_TO_PTR(args[0]);
 	mp_int_t			 x	   = mp_obj_get_int(args[1]);
 	mp_int_t			 y	   = mp_obj_get_int(args[2]);
 	mp_int_t			 w	   = mp_obj_get_int(args[3]);
@@ -1228,16 +1388,15 @@ STATIC mp_obj_t st7789_ST7789_vline(size_t n_args, const mp_obj_t *args)
 
 	return mp_const_none;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(st7789_ST7789_vline_obj, 5, 5, st7789_ST7789_vline);
-
+STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(st7735_ST7735_vline_obj, 5, 5, st7735_ST7735_vline);
 
 // Circle/Fill_Circle by https://github.com/c-logic
-// https://github.com/russhughes/st7789_mpy/pull/46
-// https://github.com/c-logic/st7789_mpy.git patch-1
+// https://github.com/russhughes/st7735_mpy/pull/46
+// https://github.com/c-logic/st7735_mpy.git patch-1
 
-STATIC mp_obj_t st7789_ST7789_circle(size_t n_args, const mp_obj_t *args)
+STATIC mp_obj_t st7735_ST7735_circle(size_t n_args, const mp_obj_t *args)
 {
-	st7789_ST7789_obj_t *self  = MP_OBJ_TO_PTR(args[0]);
+	st7735_ST7735_obj_t *self  = MP_OBJ_TO_PTR(args[0]);
 	mp_int_t			 xm	   = mp_obj_get_int(args[1]);
 	mp_int_t			 ym	   = mp_obj_get_int(args[2]);
 	mp_int_t			 r	   = mp_obj_get_int(args[3]);
@@ -1274,15 +1433,15 @@ STATIC mp_obj_t st7789_ST7789_circle(size_t n_args, const mp_obj_t *args)
 	return mp_const_none;
 }
 
-STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(st7789_ST7789_circle_obj, 5, 5, st7789_ST7789_circle);
+STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(st7735_ST7735_circle_obj, 5, 5, st7735_ST7735_circle);
 
 // Circle/Fill_Circle by https://github.com/c-logic
-// https://github.com/russhughes/st7789_mpy/pull/46
-// https://github.com/c-logic/st7789_mpy.git patch-1
+// https://github.com/russhughes/st7735_mpy/pull/46
+// https://github.com/c-logic/st7735_mpy.git patch-1
 
-STATIC mp_obj_t st7789_ST7789_fill_circle(size_t n_args, const mp_obj_t *args)
+STATIC mp_obj_t st7735_ST7735_fill_circle(size_t n_args, const mp_obj_t *args)
 {
-	st7789_ST7789_obj_t *self  = MP_OBJ_TO_PTR(args[0]);
+	st7735_ST7735_obj_t *self  = MP_OBJ_TO_PTR(args[0]);
 	mp_int_t			 xm	   = mp_obj_get_int(args[1]);
 	mp_int_t			 ym	   = mp_obj_get_int(args[2]);
 	mp_int_t			 r	   = mp_obj_get_int(args[3]);
@@ -1313,11 +1472,11 @@ STATIC mp_obj_t st7789_ST7789_fill_circle(size_t n_args, const mp_obj_t *args)
 	return mp_const_none;
 }
 
-STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(st7789_ST7789_fill_circle_obj, 5, 5, st7789_ST7789_fill_circle);
+STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(st7735_ST7735_fill_circle_obj, 5, 5, st7735_ST7735_fill_circle);
 
-STATIC mp_obj_t st7789_ST7789_rect(size_t n_args, const mp_obj_t *args)
+STATIC mp_obj_t st7735_ST7735_rect(size_t n_args, const mp_obj_t *args)
 {
-	st7789_ST7789_obj_t *self  = MP_OBJ_TO_PTR(args[0]);
+	st7735_ST7735_obj_t *self  = MP_OBJ_TO_PTR(args[0]);
 	mp_int_t			 x	   = mp_obj_get_int(args[1]);
 	mp_int_t			 y	   = mp_obj_get_int(args[2]);
 	mp_int_t			 w	   = mp_obj_get_int(args[3]);
@@ -1331,26 +1490,26 @@ STATIC mp_obj_t st7789_ST7789_rect(size_t n_args, const mp_obj_t *args)
 	return mp_const_none;
 }
 
-STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(st7789_ST7789_rect_obj, 6, 6, st7789_ST7789_rect);
+STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(st7735_ST7735_rect_obj, 6, 6, st7735_ST7735_rect);
 
-STATIC mp_obj_t st7789_ST7789_madctl(size_t n_args, const mp_obj_t *args)
+STATIC mp_obj_t st7735_ST7735_madctl(size_t n_args, const mp_obj_t *args)
 {
-	st7789_ST7789_obj_t *self = MP_OBJ_TO_PTR(args[0]);
+	st7735_ST7735_obj_t *self = MP_OBJ_TO_PTR(args[0]);
 
 	if (n_args == 2) {
 		mp_int_t	  madctl_value = mp_obj_get_int(args[1]) & 0xff;
 		const uint8_t madctl[]	   = {madctl_value};
-		write_cmd(self, ST7789_MADCTL, madctl, 1);
+		write_cmd(self, ST7735_MADCTL, madctl, 1);
 		self->madctl = madctl_value & 0xff;
 	}
 	return mp_obj_new_int(self->madctl);
 }
 
-STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(st7789_ST7789_madctl_obj, 1, 2, st7789_ST7789_madctl);
+STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(st7735_ST7735_madctl_obj, 1, 2, st7735_ST7735_madctl);
 
-STATIC mp_obj_t st7789_ST7789_offset(size_t n_args, const mp_obj_t *args)
+STATIC mp_obj_t st7735_ST7735_offset(size_t n_args, const mp_obj_t *args)
 {
-	st7789_ST7789_obj_t *self	  = MP_OBJ_TO_PTR(args[0]);
+	st7735_ST7735_obj_t *self	  = MP_OBJ_TO_PTR(args[0]);
 	mp_int_t			 colstart = mp_obj_get_int(args[1]);
 	mp_int_t			 rowstart = mp_obj_get_int(args[2]);
 
@@ -1359,21 +1518,21 @@ STATIC mp_obj_t st7789_ST7789_offset(size_t n_args, const mp_obj_t *args)
 
 	return mp_const_none;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(st7789_ST7789_offset_obj, 3, 3, st7789_ST7789_offset);
+STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(st7735_ST7735_offset_obj, 3, 3, st7735_ST7735_offset);
 
 STATIC uint16_t color565(uint8_t r, uint8_t g, uint8_t b)
 {
 	return ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | ((b & 0xF8) >> 3);
 }
 
-STATIC mp_obj_t st7789_color565(mp_obj_t r, mp_obj_t g, mp_obj_t b)
+STATIC mp_obj_t st7735_color565(mp_obj_t r, mp_obj_t g, mp_obj_t b)
 {
 	return MP_OBJ_NEW_SMALL_INT(color565(
 		(uint8_t) mp_obj_get_int(r),
 		(uint8_t) mp_obj_get_int(g),
 		(uint8_t) mp_obj_get_int(b)));
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_3(st7789_color565_obj, st7789_color565);
+STATIC MP_DEFINE_CONST_FUN_OBJ_3(st7735_color565_obj, st7735_color565);
 
 STATIC void map_bitarray_to_rgb565(uint8_t const *bitarray, uint8_t *buffer, int length, int width,
 								   uint16_t color, uint16_t bg_color)
@@ -1398,7 +1557,7 @@ STATIC void map_bitarray_to_rgb565(uint8_t const *bitarray, uint8_t *buffer, int
 	}
 }
 
-STATIC mp_obj_t st7789_map_bitarray_to_rgb565(size_t n_args, const mp_obj_t *args)
+STATIC mp_obj_t st7735_map_bitarray_to_rgb565(size_t n_args, const mp_obj_t *args)
 {
 	mp_buffer_info_t bitarray_info;
 	mp_buffer_info_t buffer_info;
@@ -1411,7 +1570,7 @@ STATIC mp_obj_t st7789_map_bitarray_to_rgb565(size_t n_args, const mp_obj_t *arg
 	map_bitarray_to_rgb565(bitarray_info.buf, buffer_info.buf, bitarray_info.len, width, color, bg_color);
 	return mp_const_none;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(st7789_map_bitarray_to_rgb565_obj, 3, 6, st7789_map_bitarray_to_rgb565);
+STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(st7735_map_bitarray_to_rgb565_obj, 3, 6, st7735_map_bitarray_to_rgb565);
 
 //
 // jpg routines
@@ -1422,15 +1581,15 @@ STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(st7789_map_bitarray_to_rgb565_obj, 3,
 
 // User defined device identifier
 typedef struct {
-	mp_file_t *	 fp;	 // File pointer for input function
-	uint8_t *	 fbuf;	 // Pointer to the frame buffer for output function
+	mp_file_t	  *fp;	 // File pointer for input function
+	uint8_t		*fbuf;	 // Pointer to the frame buffer for output function
 	unsigned int wfbuf;	 // Width of the frame buffer [pix]
 	unsigned int left;	 // jpg crop left column
 	unsigned int top;	 // jpg crop top row
 	unsigned int right;	 // jpg crop right column
 	unsigned int bottom; // jpg crop bottom row
 
-	st7789_ST7789_obj_t *self; // display object
+	st7735_ST7735_obj_t *self; // display object
 } IODEV;
 
 //
@@ -1438,11 +1597,11 @@ typedef struct {
 //
 
 static unsigned int in_func( // Returns number of bytes read (zero on error)
-	JDEC *		 jd,		 // Decompression object
-	uint8_t *	 buff,		 // Pointer to the read buffer (null to remove data)
+	JDEC		 *jd,		 // Decompression object
+	uint8_t		*buff,		 // Pointer to the read buffer (null to remove data)
 	unsigned int nbyte)		 // Number of bytes to read/remove
 {
-	IODEV *		 dev = (IODEV *) jd->device; // Device identifier for the session (5th argument of jd_prepare function)
+	IODEV		  *dev = (IODEV *) jd->device; // Device identifier for the session (5th argument of jd_prepare function)
 	unsigned int nread;
 
 	if (buff) { // Read data from input stream
@@ -1460,11 +1619,11 @@ static unsigned int in_func( // Returns number of bytes read (zero on error)
 //
 
 static int out_fast( // 1:Ok, 0:Aborted
-	JDEC * jd,		 // Decompression object
-	void * bitmap,	 // Bitmap data to be output
+	JDEC	 *jd,		 // Decompression object
+	void	 *bitmap,	 // Bitmap data to be output
 	JRECT *rect)	 // Rectangular region of output image
 {
-	IODEV *	 dev = (IODEV *) jd->device;
+	IODEV	  *dev = (IODEV *) jd->device;
 	uint8_t *src, *dst;
 	uint16_t y, bws, bwd;
 
@@ -1487,12 +1646,12 @@ static int out_fast( // 1:Ok, 0:Aborted
 //
 
 static int out_slow( // 1:Ok, 0:Aborted
-	JDEC * jd,		 // Decompression object
-	void * bitmap,	 // Bitmap data to be output
+	JDEC	 *jd,		 // Decompression object
+	void	 *bitmap,	 // Bitmap data to be output
 	JRECT *rect)	 // Rectangular region of output image
 {
-	IODEV *				 dev  = (IODEV *) jd->device;
-	st7789_ST7789_obj_t *self = dev->self;
+	IODEV			   *dev  = (IODEV *) jd->device;
+	st7735_ST7735_obj_t *self = dev->self;
 
 	uint8_t *src, *dst;
 	uint16_t y;
@@ -1529,9 +1688,9 @@ static int out_slow( // 1:Ok, 0:Aborted
 // Draw jpg from a file at x, y using a fast mode or slow mode
 //
 
-STATIC mp_obj_t st7789_ST7789_jpg(size_t n_args, const mp_obj_t *args)
+STATIC mp_obj_t st7735_ST7735_jpg(size_t n_args, const mp_obj_t *args)
 {
-	st7789_ST7789_obj_t *self = MP_OBJ_TO_PTR(args[0]);
+	st7735_ST7735_obj_t *self = MP_OBJ_TO_PTR(args[0]);
 
 	const char *filename = mp_obj_str_get_str(args[1]);
 	mp_int_t	x		 = mp_obj_get_int(args[2]);
@@ -1608,40 +1767,38 @@ STATIC mp_obj_t st7789_ST7789_jpg(size_t n_args, const mp_obj_t *args)
 	return mp_const_none;
 }
 
-STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(st7789_ST7789_jpg_obj, 4, 5, st7789_ST7789_jpg);
+STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(st7735_ST7735_jpg_obj, 4, 5, st7735_ST7735_jpg);
 
 //
 // output function for jpg_decode
 //
 
 static int out_crop( // 1:Ok, 0:Aborted
-	JDEC * jd,		 // Decompression object
-	void * bitmap,	 // Bitmap data to be output
+	JDEC	 *jd,		 // Decompression object
+	void	 *bitmap,	 // Bitmap data to be output
 	JRECT *rect)	 // Rectangular region of output image
 {
-	IODEV *	dev  = (IODEV *) jd->device;
+	IODEV *dev = (IODEV *) jd->device;
 
 	if (
 		dev->left <= rect->right &&
 		dev->right >= rect->left &&
-        dev->top <= rect->bottom &&
+		dev->top <= rect->bottom &&
 		dev->bottom >= rect->top) {
-
-		uint16_t  left		 = MAX(dev->left, rect->left);
-		uint16_t  top		 = MAX(dev->top, rect->top);
-		uint16_t  right		 = MIN(dev->right, rect->right);
-		uint16_t  bottom	 = MIN(dev->bottom, rect->bottom);
-		uint16_t  dev_width	 = dev->right - dev->left + 1;
-		uint16_t  rect_width = rect->right - rect->left + 1;
-		uint16_t  width 	 = (right - left + 1) * 2;
-		uint16_t  row;
+		uint16_t left		= MAX(dev->left, rect->left);
+		uint16_t top		= MAX(dev->top, rect->top);
+		uint16_t right		= MIN(dev->right, rect->right);
+		uint16_t bottom		= MIN(dev->bottom, rect->bottom);
+		uint16_t dev_width	= dev->right - dev->left + 1;
+		uint16_t rect_width = rect->right - rect->left + 1;
+		uint16_t width		= (right - left + 1) * 2;
+		uint16_t row;
 
 		for (row = top; row <= bottom; row++) {
 			memcpy(
-				(uint16_t *) dev->fbuf + ((row-dev->top) * dev_width) + left - dev->left,
-				(uint16_t *) bitmap + ((row-rect->top) * rect_width) + left - rect->left,
-				width
-			);
+				(uint16_t *) dev->fbuf + ((row - dev->top) * dev_width) + left - dev->left,
+				(uint16_t *) bitmap + ((row - rect->top) * rect_width) + left - rect->left,
+				width);
 		}
 	}
 	return 1; // Continue to decompress
@@ -1652,28 +1809,28 @@ static int out_crop( // 1:Ok, 0:Aborted
 // a blittable buffer, the width and height of the buffer.
 //
 
-STATIC mp_obj_t st7789_ST7789_jpg_decode(size_t n_args, const mp_obj_t *args)
+STATIC mp_obj_t st7735_ST7735_jpg_decode(size_t n_args, const mp_obj_t *args)
 {
-	st7789_ST7789_obj_t *self = MP_OBJ_TO_PTR(args[0]);
-	const char *filename;
-	mp_int_t x = 0, y = 0, width = 0, height = 0;
+	st7735_ST7735_obj_t *self = MP_OBJ_TO_PTR(args[0]);
+	const char		   *filename;
+	mp_int_t			 x = 0, y = 0, width = 0, height = 0;
 
 	if (n_args == 2 || n_args == 6) {
 		filename = mp_obj_str_get_str(args[1]);
 
 		if (n_args == 6) {
-			x      	 = mp_obj_get_int(args[2]);
-			y	   	 = mp_obj_get_int(args[3]);
-			width  	 = mp_obj_get_int(args[4]);
-			height	 = mp_obj_get_int(args[5]);
+			x	   = mp_obj_get_int(args[2]);
+			y	   = mp_obj_get_int(args[3]);
+			width  = mp_obj_get_int(args[4]);
+			height = mp_obj_get_int(args[5]);
 		}
 
 		self->work = (void *) m_malloc(3100); // Pointer to the work area
 
-		JRESULT res;						  // Result code of TJpgDec API
-		JDEC	jdec;						  // Decompression object
-		IODEV  devid;						  // User defined device identifier
-		size_t bufsize = 0;
+		JRESULT res;   // Result code of TJpgDec API
+		JDEC	jdec;  // Decompression object
+		IODEV	devid; // User defined device identifier
+		size_t	bufsize = 0;
 
 		self->fp = mp_open(filename, "rb");
 		devid.fp = self->fp;
@@ -1681,11 +1838,10 @@ STATIC mp_obj_t st7789_ST7789_jpg_decode(size_t n_args, const mp_obj_t *args)
 			// Prepare to decompress
 			res = jd_prepare(&jdec, in_func, self->work, 3100, &devid);
 			if (res == JDR_OK) {
-
 				if (n_args < 6) {
-					x = 0;
-					y = 0;
-					width = jdec.width;
+					x	   = 0;
+					y	   = 0;
+					width  = jdec.width;
 					height = jdec.height;
 				}
 				// Initialize output device
@@ -1694,7 +1850,7 @@ STATIC mp_obj_t st7789_ST7789_jpg_decode(size_t n_args, const mp_obj_t *args)
 				devid.right	 = x + width - 1;
 				devid.bottom = y + height - 1;
 
-				bufsize = 2 * width * height;
+				bufsize			 = 2 * width * height;
 				self->i2c_buffer = m_malloc(bufsize);
 				if (self->i2c_buffer) {
 					memset(self->i2c_buffer, 0xBEEF, bufsize);
@@ -1720,8 +1876,7 @@ STATIC mp_obj_t st7789_ST7789_jpg_decode(size_t n_args, const mp_obj_t *args)
 		mp_obj_t result[3] = {
 			mp_obj_new_bytearray(bufsize, (mp_obj_t *) self->i2c_buffer),
 			mp_obj_new_int(width),
-			mp_obj_new_int(height)
-		};
+			mp_obj_new_int(height)};
 
 		return mp_obj_new_tuple(3, result);
 	}
@@ -1730,13 +1885,13 @@ STATIC mp_obj_t st7789_ST7789_jpg_decode(size_t n_args, const mp_obj_t *args)
 	return mp_const_none;
 }
 
-STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(st7789_ST7789_jpg_decode_obj, 2, 6, st7789_ST7789_jpg_decode);
+STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(st7735_ST7735_jpg_decode_obj, 2, 6, st7735_ST7735_jpg_decode);
 
 //
 // Return the center of a polygon as an (x, y) tuple
 //
 
-STATIC mp_obj_t st7789_ST7789_polygon_center(size_t n_args, const mp_obj_t *args)
+STATIC mp_obj_t st7735_ST7735_polygon_center(size_t n_args, const mp_obj_t *args)
 {
 	size_t	  poly_len;
 	mp_obj_t *polygon;
@@ -1779,7 +1934,7 @@ STATIC mp_obj_t st7789_ST7789_polygon_center(size_t n_args, const mp_obj_t *args
 	mp_obj_t center[2] = {mp_obj_new_int(vsx), mp_obj_new_int(vsy)};
 	return mp_obj_new_tuple(2, center);
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(st7789_ST7789_polygon_center_obj, 2, 2, st7789_ST7789_polygon_center);
+STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(st7735_ST7735_polygon_center_obj, 2, 2, st7735_ST7735_polygon_center);
 
 //
 // RotatePolygon: Rotate a polygon around a center point angle radians
@@ -1808,7 +1963,7 @@ STATIC void RotatePolygon(Polygon *polygon, Point center, mp_float_t angle)
 //
 
 #define MAX_POLY_CORNERS 32
-STATIC void PolygonFill(st7789_ST7789_obj_t *self, Polygon *polygon, Point location, uint16_t color)
+STATIC void PolygonFill(st7735_ST7735_obj_t *self, Polygon *polygon, Point location, uint16_t color)
 {
 	int nodes, nodeX[MAX_POLY_CORNERS], pixelY, i, j, swap;
 
@@ -1883,9 +2038,9 @@ STATIC void PolygonFill(st7789_ST7789_obj_t *self, Polygon *polygon, Point locat
 	}
 }
 
-STATIC mp_obj_t st7789_ST7789_polygon(size_t n_args, const mp_obj_t *args)
+STATIC mp_obj_t st7735_ST7735_polygon(size_t n_args, const mp_obj_t *args)
 {
-	st7789_ST7789_obj_t *self = MP_OBJ_TO_PTR(args[0]);
+	st7735_ST7735_obj_t *self = MP_OBJ_TO_PTR(args[0]);
 
 	size_t	  poly_len;
 	mp_obj_t *polygon;
@@ -1956,15 +2111,15 @@ STATIC mp_obj_t st7789_ST7789_polygon(size_t n_args, const mp_obj_t *args)
 
 	return mp_const_none;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(st7789_ST7789_polygon_obj, 4, 8, st7789_ST7789_polygon);
+STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(st7735_ST7735_polygon_obj, 4, 8, st7735_ST7735_polygon);
 
 //
 //  filled convex polygon
 //
 
-STATIC mp_obj_t st7789_ST7789_fill_polygon(size_t n_args, const mp_obj_t *args)
+STATIC mp_obj_t st7735_ST7735_fill_polygon(size_t n_args, const mp_obj_t *args)
 {
-	st7789_ST7789_obj_t *self = MP_OBJ_TO_PTR(args[0]);
+	st7735_ST7735_obj_t *self = MP_OBJ_TO_PTR(args[0]);
 
 	size_t	  poly_len;
 	mp_obj_t *polygon;
@@ -2023,17 +2178,17 @@ STATIC mp_obj_t st7789_ST7789_fill_polygon(size_t n_args, const mp_obj_t *args)
 
 	return mp_const_none;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(st7789_ST7789_fill_polygon_obj, 4, 8, st7789_ST7789_fill_polygon);
+STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(st7735_ST7735_fill_polygon_obj, 4, 8, st7735_ST7735_fill_polygon);
 
-STATIC mp_obj_t st7789_ST7789_bounding(size_t n_args, const mp_obj_t *args)
+STATIC mp_obj_t st7735_ST7735_bounding(size_t n_args, const mp_obj_t *args)
 {
-	st7789_ST7789_obj_t *self = MP_OBJ_TO_PTR(args[0]);
+	st7735_ST7735_obj_t *self = MP_OBJ_TO_PTR(args[0]);
 
 	mp_obj_t bounds[4] = {
 		mp_obj_new_int(self->min_x),
 		mp_obj_new_int(self->min_y),
-		(n_args > 2 && mp_obj_is_true(args[2])) ? mp_obj_new_int(self->max_x-self->min_x+1) : mp_obj_new_int(self->max_x),
-		(n_args > 2 && mp_obj_is_true(args[2])) ? mp_obj_new_int(self->max_y-self->min_y+1) : mp_obj_new_int(self->max_y)};
+		(n_args > 2 && mp_obj_is_true(args[2])) ? mp_obj_new_int(self->max_x - self->min_x + 1) : mp_obj_new_int(self->max_x),
+		(n_args > 2 && mp_obj_is_true(args[2])) ? mp_obj_new_int(self->max_y - self->min_y + 1) : mp_obj_new_int(self->max_y)};
 
 	if (n_args > 1) {
 		if (mp_obj_is_true(args[1]))
@@ -2048,62 +2203,62 @@ STATIC mp_obj_t st7789_ST7789_bounding(size_t n_args, const mp_obj_t *args)
 	}
 	return mp_obj_new_tuple(4, bounds);
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(st7789_ST7789_bounding_obj, 1, 3, st7789_ST7789_bounding);
+STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(st7735_ST7735_bounding_obj, 1, 3, st7735_ST7735_bounding);
 
-STATIC const mp_rom_map_elem_t st7789_ST7789_locals_dict_table[] = {
-	{MP_ROM_QSTR(MP_QSTR_write), MP_ROM_PTR(&st7789_ST7789_write_obj)},
-	{MP_ROM_QSTR(MP_QSTR_write_len), MP_ROM_PTR(&st7789_ST7789_write_len_obj)},
-	{MP_ROM_QSTR(MP_QSTR_hard_reset), MP_ROM_PTR(&st7789_ST7789_hard_reset_obj)},
-	{MP_ROM_QSTR(MP_QSTR_soft_reset), MP_ROM_PTR(&st7789_ST7789_soft_reset_obj)},
-	{MP_ROM_QSTR(MP_QSTR_sleep_mode), MP_ROM_PTR(&st7789_ST7789_sleep_mode_obj)},
-	{MP_ROM_QSTR(MP_QSTR_inversion_mode), MP_ROM_PTR(&st7789_ST7789_inversion_mode_obj)},
-	{MP_ROM_QSTR(MP_QSTR_map_bitarray_to_rgb565), MP_ROM_PTR(&st7789_map_bitarray_to_rgb565_obj)},
-	{MP_ROM_QSTR(MP_QSTR_init), MP_ROM_PTR(&st7789_ST7789_init_obj)},
-	{MP_ROM_QSTR(MP_QSTR_on), MP_ROM_PTR(&st7789_ST7789_on_obj)},
-	{MP_ROM_QSTR(MP_QSTR_off), MP_ROM_PTR(&st7789_ST7789_off_obj)},
-	{MP_ROM_QSTR(MP_QSTR_pixel), MP_ROM_PTR(&st7789_ST7789_pixel_obj)},
-	{MP_ROM_QSTR(MP_QSTR_line), MP_ROM_PTR(&st7789_ST7789_line_obj)},
-	{MP_ROM_QSTR(MP_QSTR_blit_buffer), MP_ROM_PTR(&st7789_ST7789_blit_buffer_obj)},
-	{MP_ROM_QSTR(MP_QSTR_draw), MP_ROM_PTR(&st7789_ST7789_draw_obj)},
-	{MP_ROM_QSTR(MP_QSTR_draw_len), MP_ROM_PTR(&st7789_ST7789_draw_len_obj)},
-	{MP_ROM_QSTR(MP_QSTR_bitmap), MP_ROM_PTR(&st7789_ST7789_bitmap_obj)},
-	{MP_ROM_QSTR(MP_QSTR_fill_rect), MP_ROM_PTR(&st7789_ST7789_fill_rect_obj)},
-	{MP_ROM_QSTR(MP_QSTR_fill), MP_ROM_PTR(&st7789_ST7789_fill_obj)},
-	{MP_ROM_QSTR(MP_QSTR_hline), MP_ROM_PTR(&st7789_ST7789_hline_obj)},
-	{MP_ROM_QSTR(MP_QSTR_vline), MP_ROM_PTR(&st7789_ST7789_vline_obj)},
-	{MP_ROM_QSTR(MP_QSTR_fill_circle), MP_ROM_PTR(&st7789_ST7789_fill_circle_obj)},
-	{MP_ROM_QSTR(MP_QSTR_circle), MP_ROM_PTR(&st7789_ST7789_circle_obj)},
-	{MP_ROM_QSTR(MP_QSTR_rect), MP_ROM_PTR(&st7789_ST7789_rect_obj)},
-	{MP_ROM_QSTR(MP_QSTR_text), MP_ROM_PTR(&st7789_ST7789_text_obj)},
-	{MP_ROM_QSTR(MP_QSTR_rotation), MP_ROM_PTR(&st7789_ST7789_rotation_obj)},
-	{MP_ROM_QSTR(MP_QSTR_width), MP_ROM_PTR(&st7789_ST7789_width_obj)},
-	{MP_ROM_QSTR(MP_QSTR_height), MP_ROM_PTR(&st7789_ST7789_height_obj)},
-	{MP_ROM_QSTR(MP_QSTR_vscrdef), MP_ROM_PTR(&st7789_ST7789_vscrdef_obj)},
-	{MP_ROM_QSTR(MP_QSTR_vscsad), MP_ROM_PTR(&st7789_ST7789_vscsad_obj)},
-	{MP_ROM_QSTR(MP_QSTR_madctl), MP_ROM_PTR(&st7789_ST7789_madctl_obj)},
-	{MP_ROM_QSTR(MP_QSTR_offset), MP_ROM_PTR(&st7789_ST7789_offset_obj)},
-	{MP_ROM_QSTR(MP_QSTR_jpg), MP_ROM_PTR(&st7789_ST7789_jpg_obj)},
-	{MP_ROM_QSTR(MP_QSTR_jpg_decode), MP_ROM_PTR(&st7789_ST7789_jpg_decode_obj)},
-	{MP_ROM_QSTR(MP_QSTR_polygon_center), MP_ROM_PTR(&st7789_ST7789_polygon_center_obj)},
-	{MP_ROM_QSTR(MP_QSTR_polygon), MP_ROM_PTR(&st7789_ST7789_polygon_obj)},
-	{MP_ROM_QSTR(MP_QSTR_fill_polygon), MP_ROM_PTR(&st7789_ST7789_fill_polygon_obj)},
-	{MP_ROM_QSTR(MP_QSTR_bounding), MP_ROM_PTR(&st7789_ST7789_bounding_obj)},
+STATIC const mp_rom_map_elem_t st7735_ST7735_locals_dict_table[] = {
+	{MP_ROM_QSTR(MP_QSTR_write), MP_ROM_PTR(&st7735_ST7735_write_obj)},
+	{MP_ROM_QSTR(MP_QSTR_write_len), MP_ROM_PTR(&st7735_ST7735_write_len_obj)},
+	{MP_ROM_QSTR(MP_QSTR_hard_reset), MP_ROM_PTR(&st7735_ST7735_hard_reset_obj)},
+	{MP_ROM_QSTR(MP_QSTR_soft_reset), MP_ROM_PTR(&st7735_ST7735_soft_reset_obj)},
+	{MP_ROM_QSTR(MP_QSTR_sleep_mode), MP_ROM_PTR(&st7735_ST7735_sleep_mode_obj)},
+	{MP_ROM_QSTR(MP_QSTR_inversion_mode), MP_ROM_PTR(&st7735_ST7735_inversion_mode_obj)},
+	{MP_ROM_QSTR(MP_QSTR_map_bitarray_to_rgb565), MP_ROM_PTR(&st7735_map_bitarray_to_rgb565_obj)},
+	{MP_ROM_QSTR(MP_QSTR_init), MP_ROM_PTR(&st7735_ST7735_init_obj)},
+	{MP_ROM_QSTR(MP_QSTR_on), MP_ROM_PTR(&st7735_ST7735_on_obj)},
+	{MP_ROM_QSTR(MP_QSTR_off), MP_ROM_PTR(&st7735_ST7735_off_obj)},
+	{MP_ROM_QSTR(MP_QSTR_pixel), MP_ROM_PTR(&st7735_ST7735_pixel_obj)},
+	{MP_ROM_QSTR(MP_QSTR_line), MP_ROM_PTR(&st7735_ST7735_line_obj)},
+	{MP_ROM_QSTR(MP_QSTR_blit_buffer), MP_ROM_PTR(&st7735_ST7735_blit_buffer_obj)},
+	{MP_ROM_QSTR(MP_QSTR_draw), MP_ROM_PTR(&st7735_ST7735_draw_obj)},
+	{MP_ROM_QSTR(MP_QSTR_draw_len), MP_ROM_PTR(&st7735_ST7735_draw_len_obj)},
+	{MP_ROM_QSTR(MP_QSTR_bitmap), MP_ROM_PTR(&st7735_ST7735_bitmap_obj)},
+	{MP_ROM_QSTR(MP_QSTR_fill_rect), MP_ROM_PTR(&st7735_ST7735_fill_rect_obj)},
+	{MP_ROM_QSTR(MP_QSTR_fill), MP_ROM_PTR(&st7735_ST7735_fill_obj)},
+	{MP_ROM_QSTR(MP_QSTR_hline), MP_ROM_PTR(&st7735_ST7735_hline_obj)},
+	{MP_ROM_QSTR(MP_QSTR_vline), MP_ROM_PTR(&st7735_ST7735_vline_obj)},
+	{MP_ROM_QSTR(MP_QSTR_fill_circle), MP_ROM_PTR(&st7735_ST7735_fill_circle_obj)},
+	{MP_ROM_QSTR(MP_QSTR_circle), MP_ROM_PTR(&st7735_ST7735_circle_obj)},
+	{MP_ROM_QSTR(MP_QSTR_rect), MP_ROM_PTR(&st7735_ST7735_rect_obj)},
+	{MP_ROM_QSTR(MP_QSTR_text), MP_ROM_PTR(&st7735_ST7735_text_obj)},
+	{MP_ROM_QSTR(MP_QSTR_rotation), MP_ROM_PTR(&st7735_ST7735_rotation_obj)},
+	{MP_ROM_QSTR(MP_QSTR_width), MP_ROM_PTR(&st7735_ST7735_width_obj)},
+	{MP_ROM_QSTR(MP_QSTR_height), MP_ROM_PTR(&st7735_ST7735_height_obj)},
+	{MP_ROM_QSTR(MP_QSTR_vscrdef), MP_ROM_PTR(&st7735_ST7735_vscrdef_obj)},
+	{MP_ROM_QSTR(MP_QSTR_vscsad), MP_ROM_PTR(&st7735_ST7735_vscsad_obj)},
+	{MP_ROM_QSTR(MP_QSTR_madctl), MP_ROM_PTR(&st7735_ST7735_madctl_obj)},
+	{MP_ROM_QSTR(MP_QSTR_offset), MP_ROM_PTR(&st7735_ST7735_offset_obj)},
+	{MP_ROM_QSTR(MP_QSTR_jpg), MP_ROM_PTR(&st7735_ST7735_jpg_obj)},
+	{MP_ROM_QSTR(MP_QSTR_jpg_decode), MP_ROM_PTR(&st7735_ST7735_jpg_decode_obj)},
+	{MP_ROM_QSTR(MP_QSTR_polygon_center), MP_ROM_PTR(&st7735_ST7735_polygon_center_obj)},
+	{MP_ROM_QSTR(MP_QSTR_polygon), MP_ROM_PTR(&st7735_ST7735_polygon_obj)},
+	{MP_ROM_QSTR(MP_QSTR_fill_polygon), MP_ROM_PTR(&st7735_ST7735_fill_polygon_obj)},
+	{MP_ROM_QSTR(MP_QSTR_bounding), MP_ROM_PTR(&st7735_ST7735_bounding_obj)},
 };
-STATIC MP_DEFINE_CONST_DICT(st7789_ST7789_locals_dict, st7789_ST7789_locals_dict_table);
+STATIC MP_DEFINE_CONST_DICT(st7735_ST7735_locals_dict, st7735_ST7735_locals_dict_table);
 /* methods end */
 
-const mp_obj_type_t st7789_ST7789_type = {
+const mp_obj_type_t st7735_ST7735_type = {
 	{&mp_type_type},
-	.name		 = MP_QSTR_ST7789,
-	.print		 = st7789_ST7789_print,
-	.make_new	 = st7789_ST7789_make_new,
-	.locals_dict = (mp_obj_dict_t *) &st7789_ST7789_locals_dict,
+	.name		 = MP_QSTR_ST7735,
+	.print		 = st7735_ST7735_print,
+	.make_new	 = st7735_ST7735_make_new,
+	.locals_dict = (mp_obj_dict_t *) &st7735_ST7735_locals_dict,
 };
 
-mp_obj_t st7789_ST7789_make_new(const mp_obj_type_t *type,
+mp_obj_t st7735_ST7735_make_new(const mp_obj_type_t *type,
 								size_t				 n_args,
 								size_t				 n_kw,
-								const mp_obj_t *	 all_args)
+								const mp_obj_t	   *all_args)
 {
 	enum {
 		ARG_spi,
@@ -2130,8 +2285,8 @@ mp_obj_t st7789_ST7789_make_new(const mp_obj_type_t *type,
 		{MP_QSTR_backlight, MP_ARG_KW_ONLY | MP_ARG_OBJ, {.u_obj = MP_OBJ_NULL}},
 		{MP_QSTR_rotations, MP_ARG_KW_ONLY | MP_ARG_OBJ, {.u_obj = MP_OBJ_NULL}},
 		{MP_QSTR_rotation, MP_ARG_KW_ONLY | MP_ARG_INT, {.u_int = 0}},
-		{MP_QSTR_color_order, MP_ARG_KW_ONLY | MP_ARG_INT, {.u_int = ST7789_MADCTL_RGB}},
-		{MP_QSTR_inversion, MP_ARG_KW_ONLY | MP_ARG_BOOL,  {.u_bool = true}},
+		{MP_QSTR_color_order, MP_ARG_KW_ONLY | MP_ARG_INT, {.u_int = ST7735_MADCTL_RGB}},
+		{MP_QSTR_inversion, MP_ARG_KW_ONLY | MP_ARG_BOOL, {.u_bool = true}},
 		{MP_QSTR_options, MP_ARG_KW_ONLY | MP_ARG_INT, {.u_int = 0}},
 		{MP_QSTR_buffer_size, MP_ARG_KW_ONLY | MP_ARG_INT, {.u_int = 0}},
 	};
@@ -2139,8 +2294,8 @@ mp_obj_t st7789_ST7789_make_new(const mp_obj_type_t *type,
 	mp_arg_parse_all_kw_array(n_args, n_kw, all_args, MP_ARRAY_SIZE(allowed_args), allowed_args, args);
 
 	// create new object
-	st7789_ST7789_obj_t *self = m_new_obj(st7789_ST7789_obj_t);
-	self->base.type			  = &st7789_ST7789_type;
+	st7735_ST7735_obj_t *self = m_new_obj(st7735_ST7735_obj_t);
+	self->base.type			  = &st7735_ST7735_type;
 
 	// set parameters
 	mp_obj_base_t *spi_obj = (mp_obj_base_t *) MP_OBJ_TO_PTR(args[ARG_spi].u_obj);
@@ -2150,37 +2305,37 @@ mp_obj_t st7789_ST7789_make_new(const mp_obj_type_t *type,
 	self->display_height   = args[ARG_height].u_int;
 	self->height		   = args[ARG_height].u_int;
 
-	self->rotations = NULL;
+	self->rotations		= NULL;
 	self->rotations_len = 4;
 
 	if (args[ARG_rotations].u_obj != MP_OBJ_NULL) {
-		size_t len;
+		size_t	  len;
 		mp_obj_t *rotations_array = MP_OBJ_NULL;
 		mp_obj_get_array(args[ARG_rotations].u_obj, &len, &rotations_array);
 		self->rotations_len = len;
-		self->rotations = m_new(st7789_rotation_t, self->rotations_len);
+		self->rotations		= m_new(st7735_rotation_t, self->rotations_len);
 		for (int i = 0; i < self->rotations_len; i++) {
-			mp_obj_t *rotation_tuple = NULL;
-			size_t rotation_tuple_len = 0;
+			mp_obj_t *rotation_tuple	 = NULL;
+			size_t	  rotation_tuple_len = 0;
 
 			mp_obj_tuple_get(rotations_array[i], &rotation_tuple_len, &rotation_tuple);
 			if (rotation_tuple_len != 5) {
 				mp_raise_ValueError(MP_ERROR_TEXT("rotations tuple must have 5 elements"));
 			}
 
-			self->rotations[i].madctl = mp_obj_get_int(rotation_tuple[0]);
-			self->rotations[i].width = mp_obj_get_int(rotation_tuple[1]);
-			self->rotations[i].height = mp_obj_get_int(rotation_tuple[2]);
+			self->rotations[i].madctl	= mp_obj_get_int(rotation_tuple[0]);
+			self->rotations[i].width	= mp_obj_get_int(rotation_tuple[1]);
+			self->rotations[i].height	= mp_obj_get_int(rotation_tuple[2]);
 			self->rotations[i].colstart = mp_obj_get_int(rotation_tuple[3]);
 			self->rotations[i].rowstart = mp_obj_get_int(rotation_tuple[4]);
 		}
 	}
 
-	self->rotation		   = args[ARG_rotation].u_int % self->rotations_len;
-	self->color_order	   = args[ARG_color_order].u_int;
-	self->inversion 	   = args[ARG_inversion].u_bool;
-	self->options		   = args[ARG_options].u_int & 0xff;
-	self->buffer_size	   = args[ARG_buffer_size].u_int;
+	self->rotation	  = args[ARG_rotation].u_int % self->rotations_len;
+	self->color_order = args[ARG_color_order].u_int;
+	self->inversion	  = args[ARG_inversion].u_bool;
+	self->options	  = args[ARG_options].u_int & 0xff;
+	self->buffer_size = args[ARG_buffer_size].u_int;
 
 	if (self->buffer_size) {
 		self->i2c_buffer = m_malloc(self->buffer_size);
@@ -2194,7 +2349,7 @@ mp_obj_t st7789_ST7789_make_new(const mp_obj_type_t *type,
 
 	if (args[ARG_reset].u_obj != MP_OBJ_NULL) {
 		self->reset = mp_hal_get_pin_obj(args[ARG_reset].u_obj);
-	}  else {
+	} else {
 		self->reset = 0;
 	}
 
@@ -2202,13 +2357,13 @@ mp_obj_t st7789_ST7789_make_new(const mp_obj_type_t *type,
 
 	if (args[ARG_cs].u_obj != MP_OBJ_NULL) {
 		self->cs = mp_hal_get_pin_obj(args[ARG_cs].u_obj);
-	}  else {
+	} else {
 		self->cs = 0;
 	}
 
 	if (args[ARG_backlight].u_obj != MP_OBJ_NULL) {
 		self->backlight = mp_hal_get_pin_obj(args[ARG_backlight].u_obj);
-	}  else {
+	} else {
 		self->backlight = 0;
 	}
 
@@ -2221,11 +2376,11 @@ mp_obj_t st7789_ST7789_make_new(const mp_obj_type_t *type,
 	return MP_OBJ_FROM_PTR(self);
 }
 
-STATIC const mp_map_elem_t st7789_module_globals_table[] = {
-	{MP_ROM_QSTR(MP_QSTR___name__), MP_OBJ_NEW_QSTR(MP_QSTR_st7789)},
-	{MP_ROM_QSTR(MP_QSTR_color565), (mp_obj_t) &st7789_color565_obj},
-	{MP_ROM_QSTR(MP_QSTR_map_bitarray_to_rgb565), (mp_obj_t) &st7789_map_bitarray_to_rgb565_obj},
-	{MP_ROM_QSTR(MP_QSTR_ST7789), (mp_obj_t) &st7789_ST7789_type},
+STATIC const mp_map_elem_t st7735_module_globals_table[] = {
+	{MP_ROM_QSTR(MP_QSTR___name__), MP_OBJ_NEW_QSTR(MP_QSTR_st7735)},
+	{MP_ROM_QSTR(MP_QSTR_color565), (mp_obj_t) &st7735_color565_obj},
+	{MP_ROM_QSTR(MP_QSTR_map_bitarray_to_rgb565), (mp_obj_t) &st7735_map_bitarray_to_rgb565_obj},
+	{MP_ROM_QSTR(MP_QSTR_ST7735), (mp_obj_t) &st7735_ST7735_type},
 	{MP_ROM_QSTR(MP_QSTR_BLACK), MP_ROM_INT(BLACK)},
 	{MP_ROM_QSTR(MP_QSTR_BLUE), MP_ROM_INT(BLUE)},
 	{MP_ROM_QSTR(MP_QSTR_RED), MP_ROM_INT(RED)},
@@ -2236,27 +2391,34 @@ STATIC const mp_map_elem_t st7789_module_globals_table[] = {
 	{MP_ROM_QSTR(MP_QSTR_WHITE), MP_ROM_INT(WHITE)},
 	{MP_ROM_QSTR(MP_QSTR_FAST), MP_ROM_INT(JPG_MODE_FAST)},
 	{MP_ROM_QSTR(MP_QSTR_SLOW), MP_ROM_INT(JPG_MODE_SLOW)},
-	{MP_ROM_QSTR(MP_QSTR_MADCTL_MY), MP_ROM_INT(ST7789_MADCTL_MY)},
-	{MP_ROM_QSTR(MP_QSTR_MADCTL_MX), MP_ROM_INT(ST7789_MADCTL_MX)},
-	{MP_ROM_QSTR(MP_QSTR_MADCTL_MV), MP_ROM_INT(ST7789_MADCTL_MV)},
-	{MP_ROM_QSTR(MP_QSTR_MADCTL_ML), MP_ROM_INT(ST7789_MADCTL_ML)},
-	{MP_ROM_QSTR(MP_QSTR_MADCTL_MH), MP_ROM_INT(ST7789_MADCTL_MH)},
-	{MP_ROM_QSTR(MP_QSTR_RGB), MP_ROM_INT(ST7789_MADCTL_RGB)},
-	{MP_ROM_QSTR(MP_QSTR_BGR), MP_ROM_INT(ST7789_MADCTL_BGR)},
+	{MP_ROM_QSTR(MP_QSTR_MADCTL_MY), MP_ROM_INT(ST7735_MADCTL_MY)},
+	{MP_ROM_QSTR(MP_QSTR_MADCTL_MX), MP_ROM_INT(ST7735_MADCTL_MX)},
+	{MP_ROM_QSTR(MP_QSTR_MADCTL_MV), MP_ROM_INT(ST7735_MADCTL_MV)},
+	{MP_ROM_QSTR(MP_QSTR_MADCTL_ML), MP_ROM_INT(ST7735_MADCTL_ML)},
+	{MP_ROM_QSTR(MP_QSTR_MADCTL_MH), MP_ROM_INT(ST7735_MADCTL_MH)},
+	{MP_ROM_QSTR(MP_QSTR_RGB), MP_ROM_INT(ST7735_MADCTL_RGB)},
+	{MP_ROM_QSTR(MP_QSTR_BGR), MP_ROM_INT(ST7735_MADCTL_BGR)},
 	{MP_ROM_QSTR(MP_QSTR_WRAP), MP_ROM_INT(OPTIONS_WRAP)},
 	{MP_ROM_QSTR(MP_QSTR_WRAP_H), MP_ROM_INT(OPTIONS_WRAP_H)},
-	{MP_ROM_QSTR(MP_QSTR_WRAP_V), MP_ROM_INT(OPTIONS_WRAP_V)}
-};
+	{MP_ROM_QSTR(MP_QSTR_WRAP_V), MP_ROM_INT(OPTIONS_WRAP_V)},
+	{MP_ROM_QSTR(MP_QSTR_INITR_GREENTAB), MP_ROM_INT(INITR_GREENTAB)},
+	{MP_ROM_QSTR(MP_QSTR_INITR_REDTAB), MP_ROM_INT(INITR_REDTAB)},
+	{MP_ROM_QSTR(MP_QSTR_INITR_BLACKTAB), MP_ROM_INT(INITR_BLACKTAB)},
+	{MP_ROM_QSTR(MP_QSTR_INITR_GREENTAB2), MP_ROM_INT(INITR_GREENTAB2)},
+	{MP_ROM_QSTR(MP_QSTR_INITR_GREENTAB3), MP_ROM_INT(INITR_GREENTAB3)},
+	{MP_ROM_QSTR(MP_QSTR_INITR_GREENTAB4), MP_ROM_INT(INITR_GREENTAB4)},
+	{MP_ROM_QSTR(MP_QSTR_INITR_GREENTAB5), MP_ROM_INT(INITR_GREENTAB5)},
+	{MP_ROM_QSTR(MP_QSTR_INITR_REDTAB2), MP_ROM_INT(INITR_REDTAB2)},
+	{MP_ROM_QSTR(MP_QSTR_INITB), MP_ROM_INT(INITB)}};
 
-STATIC MP_DEFINE_CONST_DICT(mp_module_st7789_globals, st7789_module_globals_table);
+STATIC MP_DEFINE_CONST_DICT(mp_module_st7735_globals, st7735_module_globals_table);
 
-const mp_obj_module_t mp_module_st7789 = {
+const mp_obj_module_t mp_module_st7735 = {
 	.base	 = {&mp_type_module},
-	.globals = (mp_obj_dict_t *) &mp_module_st7789_globals,
+	.globals = (mp_obj_dict_t *) &mp_module_st7735_globals,
 };
-
 
 // use the following for older versions of MicroPython
-// MP_REGISTER_MODULE(MP_QSTR_st7789, mp_module_st7789, MODULE_ST7789_ENABLE);
+// MP_REGISTER_MODULE(MP_QSTR_st7735, mp_module_st7735, MODULE_ST7735_ENABLE);
 
-MP_REGISTER_MODULE(MP_QSTR_st7789, mp_module_st7789);
+MP_REGISTER_MODULE(MP_QSTR_st7735, mp_module_st7735);

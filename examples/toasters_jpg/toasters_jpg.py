@@ -14,22 +14,15 @@ toasters_jpg.py
 import time
 import random
 from machine import Pin, SPI
-import st7789
+import st7735
 
 #
 # Select a config module for your display
 #
 
-# Not suitable for esp32_7735_128 due to resolution
-# Not suitable for esp32_7735_160 due to resolution
-# import tdisplay as Driver
-# import twatch_2020_v2 as Driver
-# import ws_pico_114 as Driver
-# import ws_pico_13 as Driver
-# import ws_pico_2 as Driver
-import tdisplay_rp2040 as Driver
+import tft_config
 
-tft = Driver.config(0)
+tft = tft_config.config(1)
 
 class toast():
     '''
@@ -60,8 +53,15 @@ def main():
     '''
 
     # enable display and clear screen
-    tft.init()
-    tft.fill(st7789.BLACK)
+#     tft.init(st7735.INITR_GREENTAB)
+#     tft.init(st7735.INITR_REDTAB)
+#     tft.init(st7735.INITR_BLACKTAB)
+#     tft.init(st7735.INITR_GREENTAB2)
+#     tft.init(st7735.INITR_GREENTAB3)
+#     tft.init(st7735.INITR_GREENTAB4)
+    tft.init(st7735.INITR_GREENTAB5)
+#     tft.init(st7735.INITB)
+    tft.fill(st7735.BLACK)
 
     width = 64
     height = 64
@@ -91,7 +91,7 @@ def main():
                 man.y,
                 man.speed,
                 height,
-                st7789.BLACK)
+                st7735.BLACK)
 
             man.move()
 
@@ -103,7 +103,7 @@ def main():
                     man.y,
                     width,
                     height,
-                    st7789.BLACK)
+                    st7735.BLACK)
 
         time.sleep(0.05)
 

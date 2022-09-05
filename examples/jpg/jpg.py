@@ -8,18 +8,23 @@ jpg.py
 """
 
 import random
-import st7789
+import st7735
 import tft_config
 
-tft = tft_config.config(1)
+tft = tft_config.config(0)
 
 def main():
     '''
     Decode and draw jpg on display
     '''
-
-    tft.init()
-    tft.jpg(f'bigbuckbunny-{tft.width()}x{tft.height()}.jpg', 0, 0, st7789.SLOW)
-
-
+#     tft.init(st7735.INITR_GREENTAB)
+#     tft.init(st7735.INITR_REDTAB)
+#     tft.init(st7735.INITR_BLACKTAB)
+#     tft.init(st7735.INITR_GREENTAB2)
+#     tft.init(st7735.INITR_GREENTAB3)
+#     tft.init(st7735.INITR_GREENTAB4)
+    tft.init(st7735.INITR_GREENTAB5)
+#     tft.init(st7735.INITB)
+#     tft.jpg(f'bigbuckbunny-{tft.width()}x{tft.height()}.jpg', 0, 0, st7735.SLOW)
+    tft.jpg(f'bigbuckbunny-80x160.jpg', 0, 0, st7735.SLOW)
 main()

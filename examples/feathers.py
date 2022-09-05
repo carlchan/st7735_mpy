@@ -6,7 +6,7 @@ feathers.py
 import random
 import math
 import utime
-import st7789
+import st7735
 import tft_config
 
 def between(left, right, along):
@@ -20,14 +20,14 @@ def color_wheel(position):
     position = (255 - position) % 255
 
     if position < 85:
-        return st7789.color565(255 - position * 3, 0, position * 3)
+        return st7735.color565(255 - position * 3, 0, position * 3)
 
     if position < 170:
         position -= 85
-        return st7789.color565(0, position * 3, 255 - position * 3)
+        return st7735.color565(0, position * 3, 255 - position * 3)
 
     position -= 170
-    return st7789.color565(position * 3, 255 - position * 3, 0)
+    return st7735.color565(position * 3, 255 - position * 3, 0)
 
 
 def main():
@@ -35,8 +35,16 @@ def main():
     The big show!
     '''
 
-    tft = tft_config.config(1)  # configure driver to rotate screen 90 degrees
-    tft.init()                  # initialize display
+    tft = tft_config.config(1)  # configure driver to rotate screen 90 degrees              
+#   tft.init(st7735.INITR_GREENTAB)
+#   tft.init(st7735.INITR_REDTAB)
+#   tft.init(st7735.INITR_BLACKTAB)
+#   tft.init(st7735.INITR_GREENTAB2)
+#   tft.init(st7735.INITR_GREENTAB3)
+#   tft.init(st7735.INITR_GREENTAB4)
+    tft.init(st7735.INITR_GREENTAB5)
+#   tft.init(st7735.INITB)
+    # initialize display
 
     height = tft.height()       # height of display in pixels
     width = tft.width()         # width if display in pixels
@@ -49,7 +57,7 @@ def main():
 
     tft.vscrdef(tfa, width, bfa)    # set scroll area
     tft.vscsad(scroll + tfa)        # set scroll position
-    tft.fill(st7789.BLACK)          # clear screen
+    tft.fill(st7735.BLACK)          # clear screen
 
     half = (height >> 1) - 1    # half the height of the dislay
     interval = 0                # steps between new points
@@ -75,7 +83,7 @@ def main():
             increment = 1 / interval
 
         # clear the first column of the display and scroll it
-        tft.vline(scroll, 0, height, st7789.BLACK)
+        tft.vline(scroll, 0, height, st7735.BLACK)
         tft.vscsad(scroll + tfa)
 
         # get the next point between last_y and current_y
